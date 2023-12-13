@@ -13,10 +13,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-NAME = 'pyscf-template'
-AUTHOR = 'Pyscf Developer'
+NAME = 'pyscf-ita'
+AUTHOR = 'Yilin Zhao'
 AUTHOR_EMAIL = None
-DESCRIPTION  = 'PySCF extension module template'
+DESCRIPTION  = 'PySCF extension module for Information-theoretic approach.'
 SO_EXTENSIONS = {
 }
 DEPENDENCIES = ['pyscf', 'numpy']
@@ -77,8 +77,8 @@ settings = {
     'name': metadata.get('NAME', None),
     'version': VERSION,
     'description': metadata.get('DESCRIPTION', None),
-    'author': metadata.get('AUTHOR', None),
-    'author_email': metadata.get('AUTHOR_EMAIL', None),
+    'author': metadata.get('Yilin Zhao', None),
+    'author_email': metadata.get('zhaoyilin10@foxmail.com', None),
     'install_requires': metadata.get('DEPENDENCIES', []),
 }
 if 'SO_EXTENSIONS' in metadata:
