@@ -1,157 +1,310 @@
 import numpy as np
 
+__all__=["KineticEnergyDensity"]
+
 class KineticEnergyDensity:
-    def __init__(self, moldens=None):
-        """_summary_
+    r"""The kinetic-energy density class.
+    """    
+    def __init__(
+        self, 
+        dens=None, 
+        orbdens=None
+    ):
+        r""" Initialize a instance.
 
         Parameters
         ----------
-        rhos : _type_, optional
-            _description_, by default None
+        dens : ElectronDensity, optional
+            ElectronDensity instance for molecule, by default None.
+        orbdens : PartitionDensity, optional
+            PartitionDensity instance for orbitals, by default None.
         """
-        self.moldens = moldens  
+        self.dens = dens 
+        self.orbdens = orbdens 
 
-    @property    
-    def positive_definite(self):
-        rho = self.moldens.density
-        tau = rho
-        return tau
-
-    def general(self, a):
-        rho = self.moldens.density
-        rho_lapl = self.moldens.laplacian
-
-        tau = rho + 1.0/4.0*(a-1)*rho_lapl
-        return tau
-
-    @property
-    def thomas_fermi(self):
-        """Thomas-Fermi kinetic energy density.
+    def positive_definite(
+        self, 
+        tau=None,
+        omega=None
+    ):
+        r"""Positive definite or Lagrangian kinetic energy density defined as:
 
         .. math::
-            \tau_\text{TF} \left(\mathbf{r}\right) = \tfrac{3}{10} \left(6 \pi^2 \right)^{2/3}
-                \left(\frac{\rho\left(\mathbf{r}\right)}{2}\right)^{5/3}
-        """
-        rho = self.moldens.density
+           \tau_\text{PD} (\mathbf{r}) =
+           \frac{1}{2} \sum_i^N n_i \rvert \nabla \phi_i (\mathbf{r}) \lvert^2
+
+        Parameters
+        ----------
+        rho : np.ndarray((N,), dtype=float), optional
+            Electron density on grid of N points, by default None.
+        omega : np.ndarray((N,), dtype=float), optional
+            Sharing function of single atom, by default None.
+
+        Returns
+        -------
+        ked : np.ndarray((N,), dtype=float)
+            Kinetic energy density on grid of N points.
+        """        
+        if tau is None: 
+            tau = self.dens.tau() 
+        if omega is not None:
+            ked = tau*omega 
+
+        return ked
+
+    def general(
+        self, 
+        a=0.0,
+        rho=None, 
+        rho_lapl=None,
+        omega=None 
+
+    ):
+        r"""Compute general(ish) kinetic energy density defined as:
+
+        .. math::
+           \tau_\text{G} (\mathbf{r}, \alpha) =
+               \tau_\text{PD} (\mathbf{r}) +
+               \frac{1}{4} (a - 1) \nabla^2 \rho (\mathbf{r})
+
+        Parameters
+        ----------
+        a : float
+            Value of parameter :math:`a`.
+        rho : np.ndarray((N,), dtype=float), optional
+            Electron density on grid of N points, by default None.
+        rho_lapl : np.ndarray((N,), dtype=float), optional
+            Electron density laplacian on grid of N points, by default None.
+        omega : np.ndarray((N,), dtype=float), optional
+            Sharing function of single atom, by default None.
+
+        Returns
+        -------
+        ked : np.ndarray((N,), dtype=float)
+            Kinetic energy density on grid of N points.
+        """  
+        if rho is None: 
+            rho = self.dens.density()        
+        if rho_lapl is None: 
+            rho_lapl = self.dens.laplacian()
+        if omega is not None:
+            rho = rho*omega
+            rho_lapl = rho_lapl*omega
+
+        ked = rho + 1.0/4.0*(a-1)*rho_lapl
+        return ked
+
+    def thomas_fermi(
+        self, 
+        rho=None,
+        omega=None
+    ):
+        r"""Thomas-Fermi kinetic energy density defined as:
+
+        .. math::
+           \tau_\text{TF} \left(\mathbf{r}\right) = \tfrac{3}{10} \left(6 \pi^2 \right)^{2/3}
+                  \left(\frac{\rho\left(\mathbf{r}\right)}{2}\right)^{5/3}
+
+        Parameters
+        ----------
+        rho : np.ndarray((N,), dtype=float), optional
+            Electron density on grid of N points, by default None.
+        omega : np.ndarray((N,), dtype=float), optional
+            Sharing function of single atom, by default None.
+
+        Returns
+        -------
+        ked : np.ndarray((N,), dtype=float)
+            Kinetic energy density on grid of N points.
+        """        
+        if rho is None: 
+            rho = self.dens.density()        
+        if omega is not None:
+            rho = rho*omega
 
         c_tf = 0.3 * (3.0 * np.pi**2.0)**(2.0 / 3.0)
         ked = c_tf * rho ** (5.0 / 3.0)
         return ked
 
-    @property
-    def dirac(self):
-        """_summary_
+    def dirac(
+        self, 
+        rho=None,
+        omega=None
+    ):
+        r"""Dirac kinetic energy density defined as:
+
+        .. math::
+           \tau_\text{D} = \tfrac{3}{10} \left(6 \pi^2 \right)^{2/3}
+                  \left(\frac{\rho\left(\mathbf{r}\right)}{2}\right)^{5/3}
 
         Parameters
         ----------
-        rho : _type_
-            _description_
+        rho : np.ndarray((N,), dtype=float), optional
+            Electron density on grid of N points, by default None.
+        omega : np.ndarray((N,), dtype=float), optional
+            Sharing function of single atom, by default None.
 
         Returns
         -------
-        _type_
-            _description_
+        ked : np.ndarray((N,), dtype=float)
+            Kinetic energy density on grid of N points.
         """      
-        rho = self.moldens.density
+        if rho is None: 
+            rho = self.dens.density()        
+        if omega is not None:
+            rho = rho*omega
 
         c_x = 3.0/4.0*(3.0/np.pi)**(1.0/3.0) 
         ked = -c_x * rho ** (4.0 / 3.0)
         return ked
 
-    @property
-    def weizsacker(self, rho, rho_grad):    
-        """Weizsacker kinetic energy density
-        """
-        rho = self.moldens.density
-        rho_grad = self.moldens.gradient
+    def weizsacker(
+        self, 
+        rho=None, 
+        rho_grad_norm=None,
+        omega=None
+    ):    
+        r"""Weizsacker kinetic energy density defined as:
 
-        rho = np.ma.masked_less(rho, 1.0e-30)
-        rho.filled(1.0e-30)
-
-        rho_grad_square = np.linalg.norm(rho_grad, axis=0)**2
-        ked = 0.125*rho_grad_square/(rho)    
-        return ked
-    
-    @property
-    def gradient_expansion(self, rho, rho_grad, rho_lap):
-        """_summary_
+        .. math::
+           \tau_\text{W} (\mathbf{r}) = \frac{1}{8}
+           \frac{\lvert \nabla\rho (\mathbf{r}) \rvert^2}{\rho (\mathbf{r})}
 
         Parameters
         ----------
-        rho : _type_
-            _description_
-        rho_grad : _type_
-            _description_
-        rho_lap : _type_
-            _description_
+        rho : np.ndarray((N,), dtype=float), optional
+            Electron density on grid of N points, by default None.
+        rho_grad_norm : np.ndarray((N,), dtype=float), optional
+            Electron density graident norm on grid of N points, by default None.
+        omega : np.ndarray((N,), dtype=float), optional
+            Sharing function of single atom, by default None.
 
         Returns
         -------
-        _type_
-            _description_
+        ked : np.ndarray((N,), dtype=float)
+            Kinetic energy density on grid of N points.
         """
-        rho_lapl = self.moldens.laplacian             
-        tau_tf =  self.thomas_fermi
-        tau_w = self.weizsacker
-        ked = tau_tf + 1.0/9.0*tau_w + 1.0/6.0 * rho_lapl
-        return ked
+        if rho is None: 
+            rho = self.dens.density(mask=True)        
+        if rho_grad is None: 
+            rho_grad = self.dens.gradient_norm()
+        if omega is not None:
+            rho = rho*omega
+            rho_grad_norm = rho_grad_norm*omega
 
-    def single_particle(self, aos, mo_coeff, mo_occ, spin='ab'):
-        """ This is a rewrite of Pyscf eval_rho function that calculate the electron density and density derivatives.
- 
+        ked = 0.125*rho_grad_norm**2/(rho)    
+        return ked
+    
+    def gradient_expansion(
+        self,
+        a = None,
+        b = None, 
+        rho=None, 
+        rho_grad_norm=None, 
+        rho_lapl=None,
+        omega=None
+    ):
+        r"""Gradient expansion approximation of kinetic energy density defined as:
+
+        .. math::
+           \tau_\text{GEA} \left(\mathbf{r}\right) =
+           \tau_\text{TF} \left(\mathbf{r}\right) +
+           a* \tau_\text{W} \left(\mathbf{r}\right) +
+           b* \nabla^2 \rho\left(\mathbf{r}\right)
+
+        There is a special case of :func:`gradient_expansion` with
+        :math:`a=\tfrac{1}{9}` and :math:`b=\tfrac{1}{6}`.
+
         Parameters
         ----------
-        ao : 2D array of shape (N,1) for deriv=0, 3D array of shape (4,N,1) for deriv=1.
-            N is the number of grids. 
+        rho : np.ndarray((N,), dtype=float), optional
+            Electron density on grid of N points, by default None.
+        rho_grad_norm : np.ndarray((N,), dtype=float), optional
+            Electron density graident norm on grid of N points, by default None.
+        rho_lapl : np.ndarray((N,), dtype=float), optional
+            Electron density laplacian on grid of N points, by default None.
+        a : float, optional
+            Value of parameter :math:`a`, by default None.
+        b : float, optional
+            Value of parameter :math:`b`, by default None.
+        omega : np.ndarray((N,), dtype=float), optional
+            Sharing function of single atom, by default None.
+
+        Returns
+        -------
+        ked : np.ndarray((N,), dtype=float)
+            Kinetic energy density on grid of N points.
         """
-        rho_lapl = self.moldens.laplacian             
+        if a is None:
+            a = 1.0/9.0
+        if b is None:
+            b = 1.0/6.0
+        if rho is None: 
+            rho = self.dens.density()        
+        if rho_grad_norm is None: 
+            rho_grad_norm = self.dens.gradient_norm()
+        if rho_lapl is None: 
+            rho_lapl = self.dens.laplacian()
+        if omega is not None:
+            rho = rho*omega
+            rho_grad_norm = rho_grad_norm*omega
+            rho_lapl = rho_lapl*omega
 
-        ao = aos[0]
-        ao_grad = aos[1:4]
-        term1 = np.zeros(ao.shape[:-1])
+        tau_tf =  self.thomas_fermi(rho=rho)
+        tau_w = self.weizsacker(rho=rho,rho_grad_norm=rho_grad_norm)
+        ked = tau_tf + a*tau_w + b * rho_lapl
+        return ked
 
-        if len(mo_coeff.shape)==3:
-            if spin=='ab':
-                mo_coeff = mo_coeff[0] + mo_coeff[1]
-                mo_occ = mo_occ[0] + mo_occ[1]
-            elif spin=='a':
-                mo_coeff = mo_coeff[0]
-                mo_occ = mo_occ[0]
-            elif spin=='b':
-                mo_coeff = mo_coeff[1]
-                mo_occ = mo_occ[1]
-            elif spin=='m':
-                mo_coeff = mo_coeff[0] - mo_coeff[1]
-                mo_occ = mo_occ[0] - mo_occ[1]
-            else:
-                raise ValueError("Value of spin not valid.")
-        elif len(mo_coeff.shape)==2:
-            if spin=='ab':
-                pass
-            elif spin=='a' or spin=='b':
-                mo_coeff = mo_coeff/2.0
-                mo_occ = mo_occ/2.0
-            elif spin=='m':
-                mo_coeff = np.zeros_like(mo_coeff)
-                mo_occ = np.zeros_list(mo_occ)
-            else:
-                raise ValueError("Value of spin not valid.")
+    def single_particle(
+        self, 
+        rho_lapl=None,
+        orbrho=None,
+        orbrho_grad_norm=None,
+        omega=None
+    ):
+        r"""Single-particle kinetic energy density defined as:
 
-        for i, occ in enumerate(mo_occ):
-            # Make One-Particle Reduced Density Matrix, 1-RDM
-            Corb = mo_coeff[:,i].reshape((-1,1))
-            rdm1_orb = occ*np.einsum('ui,vi->uv', Corb, Corb)
+        .. math::
+           \tau_\text{s} = \sum_i \frac{1}{8} \frac{\nabla \rho_i \nabla \rho_i}{\rho_i}
+                -\frac{1}{8} \nabla^2 \rho    
 
-            rho_orb = np.einsum("gu, gv, uv -> g", ao, ao, rdm1_orb)
-            rho_orb = np.ma.masked_less(rho_orb, 1.0e-30)
-            rho_orb.filled(1.0e-30)   
+        where :math:`\rho_i` are the Kohn-Sham orbital densities.
 
-            rho_grad_orb = 2 * np.einsum("rgu, gv, uv -> rg", ao_grad, ao, rdm1_orb)
-            rho_grad_orb2 = np.linalg.norm(rho_grad_orb, axis=0)**2
+        Parameters
+        ----------
+        rho_lapl : np.ndarray((N,), dtype=float), optional
+            Electron density laplacian on grid of N points, by default None.
+        orbrho : np.ndarray((N,), dtype=float), optional
+            Electron density of orbitals on grid of N points, by default None.
+        orbrho_grad_norm : np.ndarray((N,), dtype=float), optional
+            Electron density graident norm of orbitals on grid of N points, by default None.
+        omega : np.ndarray((N,), dtype=float), optional
+            Sharing function of single atom, by default None.
 
-            term1 += rho_grad_orb2/rho_orb
+        Returns
+        -------
+        ked : np.ndarray((N,), dtype=float)
+            Kinetic energy density on grid of N points.
+        """
+        if rho_lapl is None: 
+            rho_lapl = self.dens.laplacian()
+        if orbrho is None:
+            orbrho = [] 
+            for orbdens_i in self.orbdens:
+                orbrho.append(orbdens_i.density(mask=True))
+        if orbrho_grad_norm is None: 
+            orbrho_grad_norm = [] 
+            for orbdens_i in self.orbdens:
+                orbrho_grad_norm.append(orbdens_i.gradient_norm())
+        if omega is not None:
+            rho_lapl = rho_lapl*omega
+            orbrho = [orbrho_i*omega for orbrho_i in orbrho]
+            orbrho_grad_norm = [orbrho_grad_norm_i*omega for orbrho_grad_norm_i in orbrho_grad_norm]
+
+        term1 = orbrho_grad_norm[0]**2/orbrho[0]
+        for orbrho_i,orbrho_grad_norm_i in zip(orbrho[1:],orbrho_grad_norm[1:]):
+            term1 += orbrho_grad_norm_i**2/orbrho_i
 
         term1 *= 0.125
-
         ked = term1 - 0.125*rho_lapl
         return ked

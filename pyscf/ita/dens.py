@@ -1,168 +1,155 @@
 import numpy as np
 from pyscf import dft
 
-__all__ = ['Density']
+__all__ = ["ElectronDensity", "PartitionDensity"]
 
-class Density:
-    """ Class to generate the electron density of the molecule at the desired points.
-    """    
-    def __init__(self, rhos=None):
+class ElectronDensity(np.ndarray):    
+    """Class to generate the electron density of the molecule at the desired points.
+  
+        Examples:
+
+        >>> mol = gto.M(atom='H 0 0 0; H 0 0 1.1')
+        >>> grids = dft.gen_grid.Grids(mol)
+        >>> grids.build()
+        >>> mf = scf.HF(mol)
+        >>> mf.kernel()
+        >>> ed = ita.dens.ElectronDenstiy.build(mf, grids)
+        """
+    def __new__(cls, rhos=None):
         """ Class to generate the electron density of the molecule at the desired points.
 
         Parameters
         ----------
-        rhos : List
-            1D array of size N to store electron density if deriv=0; 2D array of (4,N) to 
-            store density and “density derivatives” for x,y,z components if deriv=1; 
-            For deriv=2, returns can be a (6,N) (with_lapl=True) array where last two rows 
-            are nabla^2 rho and tau = 1/2(nabla f)^2 or (5,N) (with_lapl=False) where the last 
-            row is tau = 1/2(nabla f)^2
-        """     
-        self.rhos = rhos
-
-    @classmethod
-    def molecule(cls, method, grids_coords, spin='ab', deriv=2):
-        """ Compute the electron density of the molecule at the desired points.
-
-        Parameters
-        ----------
-        grid_coords: np.ndarray((N, 3), dtype=float)
-            Points at which to compute the density.
-        spin: ('ab' | 'a' | 'b' | 'm'), default='ab'
-            Type of density to compute; either total, alpha-spin, beta-spin, or magnetization density.
+        rhos : np.ndarray((M, N), dtype=float)
+            2D array of shape (M, N) to store electron density. 
+            For deriv=0, 2D array of (1,N) to store density;  
+            For deriv=1, 2D array of (4,N) to store density and density derivatives 
+            for x,y,z components; 
+            For deriv=2, 2D array of (6,N) (with_lapl=True) array where last two rows 
+            are nabla^2 rho and tau = 1/2(nabla f)^2 or (5,N) (with_lapl=False) where 
+            the last row is tau = 1/2(nabla f)^2.
 
         Returns
         -------
-        promol_rho
-            1D array of size N to store electron density if xctype = LDA;  2D array
-            of (4,N) to store density and "density derivatives" for x,y,z components
-            if xctype = GGA; For meta-GGA, returns can be a (6,N) (with_lapl=True)
-            array where last two rows are \nabla^2 rho and tau = 1/2(\nabla f)^2
+        obj : ElectronDensity
+            Instance of ElectronDensity class.
+        """
+        if rhos is None:             
+            obj = np.asarray(0).view(cls)    
+        else:    
+            obj = np.asarray(rhos).view(cls)        
+        return obj
+         
+    @classmethod
+    def build(
+        cls, 
+        method, 
+        grids_coords, 
+        spin='ab', 
+        deriv=2
+    ):
+        r""" Compute the electron density of the molecule at the desired points.
+
+        Parameters
+        ----------
+        method : PyscfMethod
+            Pyscf scf method or post-scf method instance.        
+        grid_coords: np.ndarray((N, 3), dtype=float)
+            Points at which to compute the density.
+        spin: ('ab' | 'a' | 'b' | 'm')
+            Type of density to compute; either total, alpha-spin, beta-spin, or magnetization density,
+            by default 'ab'.
+        deriv : int
+            List of molecule and promolecule derivative+1 level, by default 2.
+
+        Returns
+        -------
+        obj : ElectronDensity
+            Instance of ElectronDensity class.
         """
         mol = method.mol
         rdm1 = method.make_rdm1()
-        rdm1 = np.array(rdm1)
+        rdm1 = ElectronDensity.spin_reduction(np.array(rdm1), spin)
 
-        if len(rdm1.shape)==3:
-            if spin=='ab':
-                rdm1 = rdm1[0] + rdm1[1]
-            elif spin=='a':
-                rdm1 = rdm1[0]
-            elif spin=='b':
-                rdm1 = rdm1[1]
-            elif spin=='m':
-                rdm1 = rdm1[0] - rdm1[1]
-            else:
-                raise ValueError("Value of spin not valid.")
-            
-        elif len(rdm1.shape)==2:
-            if spin=='ab':
-                rdm1 = rdm1
-            elif spin=='a':
-                rdm1 = rdm1/2.0
-            elif spin=='b':
-                rdm1 = rdm1/2.0
-            elif spin=='m':
-                rdm1 = np.zeros_like(rdm1)
-            else:
-                raise ValueError("Value of spin not valid.")
-
-        # Build instance of ITA class
         aos = dft.numint.eval_ao(mol, grids_coords, deriv=deriv)
         if deriv==0:
-            rhos = [dft.numint.eval_rho(mol, aos, rdm1, xctype='LDA')]
+            rhos = dft.numint.eval_rho(mol, aos, rdm1, xctype='LDA').reshape((1,-1))
         elif deriv==1:
-            rhos = dft.numint.eval_rho(mol, aos, rdm1, xctype='GGA')
+            rhos = dft.numint.eval_rho(mol, aos, rdm1, xctype='GGA')      
         elif deriv==2:
-            rhos = dft.numint.eval_rho(mol, aos, rdm1, xctype='mGGA')
+            rhos = dft.numint.eval_rho(mol, aos, rdm1, xctype='mGGA')         
         else:
             raise ValueError('Level value not valid.')
 
-        obj = cls(rhos) 
+        obj = cls(rhos)
         return obj
 
-    @classmethod
-    def promolecule(cls, method, grids_coords, charge, multiplicity, spin='ab', deriv=2):
-        """ Compute the electron density of the promolecule at the desired points.
+    @staticmethod 
+    def spin_reduction(tensor, spin):
+        """Unified the shape of mo_coeff to square matirx, mo_occ to vector 
+        according to spin type. 
 
         Parameters
         ----------
-        grid_coords: np.ndarray((N, 3), dtype=float)
-            Points at which to compute the density.
+        tensor : np.ndarray
+            Tensor of mo_coeff or mo_occ.
         spin: ('ab' | 'a' | 'b' | 'm'), default='ab'
             Type of density to compute; either total, alpha-spin, beta-spin, or magnetization density.
 
         Returns
         -------
-        promol_rho
-            1D array of size N to store electron density if xctype = LDA;  2D array
-            of (4,N) to store density and "density derivatives" for x,y,z components
-            if xctype = GGA; For meta-GGA, returns can be a (6,N) (with_lapl=True)
-            array where last two rows are \nabla^2 rho and tau = 1/2(\nabla f)^2
-        """
-        from pyscf.ita.promolecule import ProMolecule
-        mol = method.mol
-        promethods = ProMolecule.build(method, charge, multiplicity)
-
-        if deriv ==0:
-            promol_rhos = []
-        elif deriv ==1:
-            promol_rhos = []
-        elif deriv ==2:
-            promol_rhos = []
-        else:
-            raise ValueError('Level value not valid.')
-
-        for atom_geom in mol._atom:
-            symbol = atom_geom[0]
-            promethods[symbol].mol.set_geom_([atom_geom],unit='B')
-            rdm1 = promethods[symbol].make_rdm1()
-            rdm1 = np.array(rdm1)
-            if len(rdm1.shape)==3:
-                if spin=='ab':
-                    rdm1 = rdm1[0] + rdm1[1]
-                elif spin=='a':
-                    rdm1 = rdm1[0]
-                elif spin=='b':
-                    rdm1 = rdm1[1]
-                elif spin=='m':
-                    rdm1 = rdm1[0] - rdm1[1]
-                else:
-                    raise ValueError("Value of spin not valid.")
-            elif len(rdm1.shape)==2:
-                if spin=='ab':
-                    rdm1 = rdm1
-                elif spin=='a':
-                    rdm1 = rdm1/2.0
-                elif spin=='b':
-                    rdm1 = rdm1/2.0
-                elif spin=='m':
-                    rdm1 = np.zeros_like(rdm1)
-                else:
-                    raise ValueError("Value of spin not valid.")
-
-            # Build instance of ITA class
-            aos = dft.numint.eval_ao(promethods[symbol].mol, grids_coords, deriv=deriv)
-            if deriv==0:
-                promol_rhos.append(dft.numint.eval_rho(promethods[symbol].mol, aos, rdm1, xctype='LDA'))
-            elif deriv==1:
-                promol_rhos.append(dft.numint.eval_rho(promethods[symbol].mol, aos, rdm1, xctype='LDA'))
-            elif deriv==2:
-                promol_rhos.append(dft.numint.eval_rho(promethods[symbol].mol, aos, rdm1, xctype='LDA'))
+        tensor : np.ndarray 
+            Square matrix mo_coeff or vector mo_occ.
+        """        
+        if len(tensor.shape)==3:
+            if spin=='ab':
+                tensor = tensor[0] + tensor[1]
+            elif spin=='a':
+                tensor = tensor[0]
+            elif spin=='b':
+                tensor = tensor[1]
+            elif spin=='m':
+                tensor = tensor[0] - tensor[1]
             else:
-                raise ValueError('Level value not valid.')
-                
-        obj = cls(promol_rhos)
-        return obj
+                raise ValueError("Value of spin not valid.")
+        elif len(tensor.shape)==2:
+            if spin=='ab':
+                tensor = tensor
+            elif spin=='a':
+                tensor = tensor/2.0
+            elif spin=='b':
+                tensor = tensor/2.0
+            elif spin=='m':
+                tensor = np.zeros_like(tensor)
+            else:
+                raise ValueError("Value of spin not valid.")
+        return tensor
 
-    @property
-    def density(self):
-        r"""Electron density :math:`\rho\left(\mathbf{r}\right)`."""
+    def density(self, mask=False, threshold=1.0e-30):
+        r"""Electron density :math:`\rho\left(\mathbf{r}\right)`.
         
-        return self.rhos[0]
+        Parameters
+        ----------
+        mask : Bool
+            If mask the corresponding element of the associated array which is
+            less than given the threshold.
+        threshold : float
+            Threshold for array element to mask or fill.
 
-    @property
-    def gradient(self):
+        Returns
+        -------
+        rho : np.ndarray((N,), dtype=float)
+            Electron density on grid of N points.        
+        """
+        if mask:
+            rho = np.array(self[0])
+            rho = np.ma.masked_less(rho, threshold)
+            rho.filled(threshold)
+        else:
+            rho = np.array(self[0])
+        return rho
+
+    def gradient(self, mask=False, threshold=1.0e-30):
         r"""Gradient of electron density :math:`\nabla \rho\left(\mathbf{r}\right)`.
 
         This is the first-order partial derivatives of electron density w.r.t. coordinate
@@ -172,11 +159,26 @@ class Density:
             \nabla\rho\left(\mathbf{r}\right) =
             \left(\frac{\partial}{\partial x}\mathbf{i}, \frac{\partial}{\partial y}\mathbf{j},
                   \frac{\partial}{\partial z}\mathbf{k}\right) \rho\left(\mathbf{r}\right)
-        """
-        return self.rhos[1:4]
 
-    @property
-    def gradient_norm(self):
+        Parameters
+        ----------
+        mask : Bool
+            If mask the corresponding element of the associated array which is
+            less than given the threshold.
+        threshold : float
+            Threshold for array element to mask or fill.
+
+        Returns
+        -------
+        rho_grad : np.ndarray((3,N), dtype=float)
+        """
+        rho_grad = np.array(self[1:4])
+        if mask:
+            rho_grad = np.ma.masked_less(rho_grad, threshold)
+            rho_grad.filled(threshold)
+        return rho_grad
+            
+    def gradient_norm(self, mask=False, threshold=1.0e-30):
         r"""Norm of the gradient of electron density.
 
         .. math::
@@ -184,12 +186,23 @@ class Density:
                   \left(\frac{\partial\rho\left(\mathbf{r}\right)}{\partial x}\right)^2 +
                   \left(\frac{\partial\rho\left(\mathbf{r}\right)}{\partial y}\right)^2 +
                   \left(\frac{\partial\rho\left(\mathbf{r}\right)}{\partial z}\right)^2 }
+
+        Parameters
+        ----------
+        mask : Bool
+            If mask the corresponding element of the associated array which is
+            less than given the threshold.
+        threshold : float
+            Threshold for array element to mask or fill.
+
+        Returns
+        -------
+        grad_rho_norm : np.ndarray((N,), dtype=float)
         """
-        norm = np.linalg.norm(self.gradient, axis=1)
-        return norm
+        grad_norm = np.linalg.norm(self.gradient(mask=mask,threshold=threshold), axis=0)
+        return grad_norm
 
-    @property
-    def laplacian(self):
+    def laplacian(self, mask=False, threshold=1.0e-30):
         r"""Laplacian of electron density :math:`\nabla ^2 \rho\left(\mathbf{r}\right)`.
 
         This is defined as the trace of Hessian matrix of electron density which is equal to
@@ -201,11 +214,26 @@ class Density:
                      \frac{\partial^2\rho\left(\mathbf{r}\right)}{\partial y^2} +
                      \frac{\partial^2\rho\left(\mathbf{r}\right)}{\partial z^2} =
                      \lambda_1 + \lambda_2 + \lambda_3
-        """        
-        return self.rhos[5]
-    
-    @property
-    def tau(self):
+
+        Parameters
+        ----------
+        mask : Bool
+            If mask the corresponding element of the associated array which is
+            less than given the threshold.
+        threshold : float
+            Threshold for array element to mask or fill.
+
+        Returns
+        -------
+        rho_lapl : np.ndarray((N,), dtype=float)
+        """   
+        rho_lapl = np.array(self[4])
+        if mask:
+            rho_lapl = np.ma.masked_less(rho_lapl, threshold)
+            rho_lapl.filled(threshold)
+        return rho_lapl
+                     
+    def tau(self, mask=False, threshold=1.0e-30):
         r"""Laplacian of electron density :math:`\nabla ^2 \rho\left(\mathbf{r}\right)`.
 
         This is defined as the trace of Hessian matrix of electron density which is equal to
@@ -217,64 +245,287 @@ class Density:
                      \frac{\partial^2\rho\left(\mathbf{r}\right)}{\partial y^2} +
                      \frac{\partial^2\rho\left(\mathbf{r}\right)}{\partial z^2} =
                      \lambda_1 + \lambda_2 + \lambda_3
+
+        Parameters
+        ----------
+        mask : Bool
+            If mask the corresponding element of the associated array which is
+            less than given the threshold.
+        threshold : float
+            Threshold for array element to mask or fill.
+
+        Returns
+        -------
+        rho_tau : np.ndarray((N,), dtype=float)
+        """      
+        rho_tau = np.array(self[5])
+        if mask:
+            rho_tau = np.ma.masked_less(rho_tau, threshold)
+            rho_tau.filled(threshold)
+        return rho_tau
+              
+class PartitionDensity(list):    
+    """Class to generate the partition electron density of the molecule at the desired points.
+  
+        Examples:
+
+        >>> mol = gto.M(atom='H 0 0 0; H 0 0 1.1')
+        >>> grids = dft.gen_grid.Grids(mol)
+        >>> grids.build()
+        >>> mf = scf.HF(mol)
+        >>> mf.kernel()
+        >>> pd = ita.dens.PartitionDenstiy.orbital(mf, grids)
+        """
+    def __new__(cls, rhos=None):
+        """ Class to generate the partition electron density of the molecule at the desired points.
+
+        Parameters
+        ----------
+        rhos : np.ndarray((M, N), dtype=float)
+            2D array of shape (M, N) to store electron density. 
+            For deriv=0, 2D array of (1,N) to store density;  
+            For deriv=1, 2D array of (4,N) to store density and density derivatives 
+            for x,y,z components; 
+            For deriv=2, 2D array of (6,N) (with_lapl=True) array where last two rows 
+            are nabla^2 rho and tau = 1/2(nabla f)^2 or (5,N) (with_lapl=False) where 
+            the last row is tau = 1/2(nabla f)^2.
+
+        Returns
+        -------
+        obj : PartitionDensity
+            Instance of PartitionDensity class.
+        """
+        if rhos is None:    
+            obj = list().__new__(cls)        
+        else:   
+            obj = list().__new__(cls, rhos) 
+        return obj
+
+    @classmethod
+    def orbital(
+        cls, 
+        method, 
+        grids_coords, 
+        spin='ab', 
+        deriv=1
+    ):
+        r""" Compute the orbital electron density of the molecule at the desired points.
+
+        Parameters
+        ----------
+        method : PyscfMethod
+            Pyscf scf method or post-scf method instance.        
+        grid_coords: np.ndarray((N, 3), dtype=float)
+            Points at which to compute the density.
+        spin: ('ab' | 'a' | 'b' | 'm')
+            Type of density to compute; either total, alpha-spin, beta-spin, or magnetization density,
+            by default 'ab'.
+        deriv : int
+            List of molecule and promolecule derivative+1 level, by default 1.
+
+        Returns
+        -------
+        obj : PartitionDensity
+            Instance of PartitionDensity class.
         """        
-        return self.rhos[6]    
+        mol = method.mol
+        rdm1 = method.make_rdm1()
+        rdm1 = ElectronDensity.spin_reduction(np.array(rdm1), spin)
+        mo_coeff = ElectronDensity.spin_reduction(np.array(method.mo_coeff), spin) 
+        mo_occ = ElectronDensity.spin_reduction(np.array(method.mo_occ), spin) 
+        mo_coeff = mo_coeff[:,mo_occ>0]
+        mo_occ = mo_occ[mo_occ>0]
 
-def eval_rho(aos, rdm1, deriv, with_lapl=True):
-    """ This is a rewrite of Pyscf eval_rho function that calculate the electron density and density derivatives.
+        aos = dft.numint.eval_ao(mol, grids_coords, deriv=deriv)
+        partition_density = []
+        if deriv==0:                
+            ao = aos
+            for i, occ in enumerate(mo_occ):
+                # Make One-Particle Reduced Density Matrix, 1-RDM
+                Corb = mo_coeff[:,i].reshape((-1,1))
+                orb_rdm1 = occ*np.einsum('ui,vi->uv', Corb, Corb)
+                orb_rhos = np.einsum("gu, gv, uv -> g", ao, ao, orb_rdm1)
 
-    Parameters
-    ----------
-    aos : 2D array of shape (N,nao) for deriv=0, 3D array of shape (4,N,nao) for deriv=1.
-        N is the number of grids, nao is the number of AO functions. If deriv=2, 
-        ao[0] is AO value and ao[1:3] are the AO gradients. ao[4:10] are second 
-        derivatives of ao values if applicable.    
-    rdm1 : 2D array
-        Density matrix
-    deriv : int
-        Order of density derivatives, it affects the shape of the return density.
+                ed = ElectronDensity(orb_rhos)
+                partition_density.append(ed)
 
-    Returns
-    -------
-    List
-        1D array of size N to store electron density if deriv=0; 2D array of (4,N) to 
-        store density and “density derivatives” for x,y,z components if deriv=1; 
-        For deriv=2, returns can be a (6,N) (with_lapl=True) array where last two rows 
-        are nabla^2 rho and tau = 1/2(nabla f)^2 or (5,N) (with_lapl=False) where the last 
-        row is tau = 1/2(nabla f)^2
-    """
-    if deriv==0:
-        ao = aos
-        rho = np.einsum("gu, gv, uv -> g", ao, ao, rdm1)
+        elif deriv==1:
+            ao = aos[0]
+            ao_grad = aos[1:4]
+            for i, occ in enumerate(mo_occ):
+                # Make One-Particle Reduced Density Matrix, 1-RDM
+                Corb = mo_coeff[:,i].reshape((-1,1))
+                orb_rdm1 = occ*np.einsum('ui,vi->uv', Corb, Corb)
+                orb_rho = np.einsum("gu, gv, uv -> g", ao, ao, orb_rdm1)
+                orb_rho = orb_rho.reshape(1,-1)
+                orb_rho_grad = 2 * np.einsum("rgu, gv, uv -> rg", ao_grad, ao, orb_rdm1)
+                orb_rhos = np.concatenate([orb_rho, orb_rho_grad])
+
+                ed = ElectronDensity(orb_rhos)
+                partition_density.append(ed)
+
+        elif deriv==2:
+            ao = aos[0]
+            ao_grad = aos[1:4]        
+            ao_hess = np.array([
+                [aos[4], aos[5], aos[6]],
+                [aos[5], aos[7], aos[8]],
+                [aos[6], aos[8], aos[9]],
+            ])
+            for i, occ in enumerate(mo_occ):
+                Corb = mo_coeff[:,i].reshape((-1,1))
+                orb_rdm1 = occ*np.einsum('ui,vi->uv', Corb, Corb) 
+                orb_rho = np.einsum("gu, gv, uv -> g", ao, ao, orb_rdm1)
+                orb_rho = orb_rho.reshape(1,-1)
+                orb_rho_grad = 2 * np.einsum("rgu, gv, uv -> rg", ao_grad, ao, orb_rdm1)
+                orb_rho_hess = (
+                    + 2 * np.einsum("rwgu, gv, uv -> rwg", ao_hess, ao, orb_rdm1)
+                    + 2 * np.einsum("rgu, wgv, uv -> rwg", ao_grad, ao_grad, orb_rdm1)
+                )
+                orb_rho_lapl = orb_rho_hess.trace().reshape((1,-1))
+                orb_tau = 0.5 * np.einsum("rgu, wgv, uv -> rwg", ao_grad, ao_grad, orb_rdm1).trace().reshape((1,-1))
+                orb_rhos = np.concatenate([orb_rho, orb_rho_grad, orb_rho_lapl, orb_tau])
+
+                ed = ElectronDensity(orb_rhos)
+                partition_density.append(ed)
+
+        obj = cls(partition_density)       
+        return obj
+
+    def density(self, mask=False, threshold=1.0e-30):
+        r"""Electron density :math:`\rho\left(\mathbf{r}\right)`.
+
+        Parameters
+        ----------
+        mask : Bool
+            If mask the corresponding element of the associated array which is
+            less than given the threshold.
+        threshold : float
+            Threshold for array element to mask or fill.
+
+        Returns
+        -------
+        rho : np.ndarray((N,), dtype=float)
+        """
+        if mask:
+            rho = np.array(sum(self)[0])
+            rho = np.ma.masked_less(rho, threshold)
+            rho.filled(threshold)
+        else:
+            rho = np.array(self[0])
         return rho
 
-    elif deriv==1:
-        ao = aos[0]
-        ao_grad = aos[1:4]
+    def gradient(self, mask=False, threshold=1.0e-30):
+        r"""Gradient of electron density :math:`\nabla \rho\left(\mathbf{r}\right)`.
 
-        rho = np.einsum("gu, gv, uv -> g", ao, ao, rdm1)
-        rho_grad = 2 * np.einsum("rgu, gv, uv -> rg", ao_grad, ao, rdm1)
-        return [rho, *rho_grad]
+        This is the first-order partial derivatives of electron density w.r.t. coordinate
+        :math:`\mathbf{r} = \left(x\mathbf{i}, y\mathbf{j}, z\mathbf{k}\right)`,
 
-    elif deriv==2:
-        ao = aos[0]
-        ao_grad = aos[1:4]        
-        ao_hess = np.array([
-            [aos[4], aos[5], aos[6]],
-            [aos[5], aos[7], aos[8]],
-            [aos[6], aos[8], aos[9]],
-        ])  
+         .. math::
+            \nabla\rho\left(\mathbf{r}\right) =
+            \left(\frac{\partial}{\partial x}\mathbf{i}, \frac{\partial}{\partial y}\mathbf{j},
+                  \frac{\partial}{\partial z}\mathbf{k}\right) \rho\left(\mathbf{r}\right)
 
-        rho = np.einsum("gu, gv, uv -> g", ao, ao, rdm1)
-        rho_grad = 2 * np.einsum("rgu, gv, uv -> rg", ao_grad, ao, rdm1)
-        rho_hess = (
-            + 2 * np.einsum("rwgu, gv, uv -> rwg", ao_hess, ao, rdm1)
-            + 2 * np.einsum("rgu, wgv, uv -> rwg", ao_grad, ao_grad, rdm1)
-        )
-        rho_lapl = rho_hess.trace()
-        tau = 2 * np.einsum("rgu, wgv, uv -> rwg", ao_grad, ao_grad, rdm1)
+        Parameters
+        ----------
+        mask : Bool
+            If mask the corresponding element of the associated array which is
+            less than given the threshold.
+        threshold : float
+            Threshold for array element to mask or fill.
 
-        if with_lapl==True:
-            return [rho, *rho_grad, rho_lapl, tau]   
-        else:   
-            return [rho, *rho_grad, tau]   
+        Returns
+        -------
+        rho_grad : np.ndarray((3,N), dtype=float)
+        """
+        rho_grad = np.array(sum(self)[1:4])
+        if mask:
+            rho_grad = np.ma.masked_less(rho_grad, threshold)
+            rho_grad.filled(threshold)
+        return rho_grad
+            
+    def gradient_norm(self, mask=False, threshold=1.0e-30):
+        r"""Norm of the gradient of electron density.
+
+        .. math::
+           \lvert \nabla \rho\left(\mathbf{r}\right) \rvert = \sqrt{
+                  \left(\frac{\partial\rho\left(\mathbf{r}\right)}{\partial x}\right)^2 +
+                  \left(\frac{\partial\rho\left(\mathbf{r}\right)}{\partial y}\right)^2 +
+                  \left(\frac{\partial\rho\left(\mathbf{r}\right)}{\partial z}\right)^2 }
+
+        Parameters
+        ----------
+        mask : Bool
+            If mask the corresponding element of the associated array which is
+            less than given the threshold.
+        threshold : float
+            Threshold for array element to mask or fill.
+
+        Returns
+        -------
+        grad_norm : np.ndarray((N,), dtype=float)
+        """
+        grad_norm = np.linalg.norm(self.gradient(mask=mask,fill=threshold), axis=0)
+        return grad_norm
+
+    def laplacian(self, mask=False, threshold=1.0e-30):
+        r"""Laplacian of electron density :math:`\nabla ^2 \rho\left(\mathbf{r}\right)`.
+
+        This is defined as the trace of Hessian matrix of electron density which is equal to
+        the sum of its :math:`\left(\lambda_1, \lambda_2, \lambda_3\right)` eigen-values:
+
+        .. math::
+           \nabla^2 \rho\left(\mathbf{r}\right) = \nabla\cdot\nabla\rho\left(\mathbf{r}\right) =
+                     \frac{\partial^2\rho\left(\mathbf{r}\right)}{\partial x^2} +
+                     \frac{\partial^2\rho\left(\mathbf{r}\right)}{\partial y^2} +
+                     \frac{\partial^2\rho\left(\mathbf{r}\right)}{\partial z^2} =
+                     \lambda_1 + \lambda_2 + \lambda_3
+
+        Parameters
+        ----------
+        mask : Bool
+            If mask the corresponding element of the associated array which is
+            less than given the threshold.
+        threshold : float
+            Threshold for array element to mask or fill.
+
+        Returns
+        -------
+        rho_lapl : np.ndarray((N,), dtype=float)
+        """   
+        rho_lapl = np.array(sum(self)[4])
+        if mask:
+            rho_lapl = np.ma.masked_less(rho_lapl, threshold)
+            rho_lapl.filled(threshold)
+        return rho_lapl
+                     
+    def tau(self, mask=False, threshold=1.0e-30):
+        r"""Laplacian of electron density :math:`\nabla ^2 \rho\left(\mathbf{r}\right)`.
+
+        This is defined as the trace of Hessian matrix of electron density which is equal to
+        the sum of its :math:`\left(\lambda_1, \lambda_2, \lambda_3\right)` eigen-values:
+
+        .. math::
+           \nabla^2 \rho\left(\mathbf{r}\right) = \nabla\cdot\nabla\rho\left(\mathbf{r}\right) =
+                     \frac{\partial^2\rho\left(\mathbf{r}\right)}{\partial x^2} +
+                     \frac{\partial^2\rho\left(\mathbf{r}\right)}{\partial y^2} +
+                     \frac{\partial^2\rho\left(\mathbf{r}\right)}{\partial z^2} =
+                     \lambda_1 + \lambda_2 + \lambda_3
+
+        Parameters
+        ----------
+        mask : Bool
+            If mask the corresponding element of the associated array which is
+            less than given the threshold.
+        threshold : float
+            Threshold for array element to mask or fill.
+
+        Returns
+        -------
+        rho_tau : np.ndarray((N,), dtype=float)
+        """      
+        rho_tau = np.array(sum(self)[5])
+        if mask:
+            rho_tau = np.ma.masked_less(rho_tau, threshold)
+            rho_tau.filled(threshold)
+        return rho_tau
