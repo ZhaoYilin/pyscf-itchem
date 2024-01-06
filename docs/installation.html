@@ -1,9 +1,10 @@
 <!DOCTYPE html>
 <html class="writer-html5" lang="en" data-content_root="../">
 <head>
-  <meta charset="utf-8" />
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Overview: module code &mdash; pyscf-ita 0.1.0 documentation</title>
+  <title>1. Installation &mdash; pyscf-ita 0.1.0 documentation</title>
       <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=92fd9be5" />
       <link rel="stylesheet" type="text/css" href="../_static/css/theme.css?v=19f00094" />
 
@@ -19,9 +20,13 @@
         <script src="../_static/doctools.js?v=888ff710"></script>
         <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
         <script crossorigin="anonymous" integrity="sha256-Ae2Vz/4ePdIu6ZyI/5ZGsYnb+m0JlOmKPjt6XZ9JJkA=" src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.4/require.min.js"></script>
+        <script>window.MathJax = {"tex": {"inlineMath": [["$", "$"], ["\\(", "\\)"]], "processEscapes": true}, "options": {"ignoreHtmlClass": "tex2jax_ignore|mathjax_ignore|document", "processHtmlClass": "tex2jax_process|mathjax_process|math|output_area"}}</script>
+        <script defer="defer" src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
     <script src="../_static/js/theme.js"></script>
     <link rel="index" title="Index" href="../genindex.html" />
-    <link rel="search" title="Search" href="../search.html" /> 
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="2. Quick Start" href="quickstart.html" />
+    <link rel="prev" title="PYSCF-ITA" href="../index.html" /> 
 </head>
 
 <body class="wy-body-for-nav"> 
@@ -45,10 +50,14 @@
 </div>
         </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
               <p class="caption" role="heading"><span class="caption-text">USER DOCUMENTATION:</span></p>
-<ul>
-<li class="toctree-l1"><a class="reference internal" href="../user/installation.html">1. Installation</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../user/quickstart.html">2. Quick Start</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../user/examples.html">3. Examples</a></li>
+<ul class="current">
+<li class="toctree-l1 current"><a class="current reference internal" href="#">1. Installation</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#Prerequisites">1.1. Prerequisites</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#Compiling-from-source-code">1.2. Compiling from source code</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="quickstart.html">2. Quick Start</a></li>
+<li class="toctree-l1"><a class="reference internal" href="examples.html">3. Examples</a></li>
 </ul>
 <p class="caption" role="heading"><span class="caption-text">DEVELOPER DOCUMENTATION:</span></p>
 <ul>
@@ -71,8 +80,9 @@
           <div role="navigation" aria-label="Page navigation">
   <ul class="wy-breadcrumbs">
       <li><a href="../index.html" class="icon icon-home" aria-label="Home"></a></li>
-      <li class="breadcrumb-item active">Overview: module code</li>
+      <li class="breadcrumb-item active"><span class="section-number">1. </span>Installation</li>
       <li class="wy-breadcrumbs-aside">
+            <a href="../_sources/user/installation.ipynb.txt" rel="nofollow"> View page source</a>
       </li>
   </ul>
   <hr/>
@@ -80,19 +90,47 @@
           <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
            <div itemprop="articleBody">
              
-  <h1>All modules for which code is available</h1>
-<ul><li><a href="pyscf/ita/aim.html">pyscf.ita.aim</a></li>
-<li><a href="pyscf/ita/dens.html">pyscf.ita.dens</a></li>
-<li><a href="pyscf/ita/ita.html">pyscf.ita.ita</a></li>
-<li><a href="pyscf/ita/itad.html">pyscf.ita.itad</a></li>
-<li><a href="pyscf/ita/ked.html">pyscf.ita.ked</a></li>
-<li><a href="pyscf/ita/promolecule.html">pyscf.ita.promolecule</a></li>
-<li><a href="pyscf/ita/script.html">pyscf.ita.script</a></li>
+  <section id="Installation">
+<h1><span class="section-number">1. </span>Installation<a class="headerlink" href="#Installation" title="Link to this heading"></a></h1>
+<p>This section gives the recommended way to install PYSCF-ITA. One can find the source code on Github <a class="reference external" href="https://zhaoyilin.github.io/pyscf-ita/">https://zhaoyilin.github.io/pyscf-ita/</a>.</p>
+<section id="Prerequisites">
+<h2><span class="section-number">1.1. </span>Prerequisites<a class="headerlink" href="#Prerequisites" title="Link to this heading"></a></h2>
+<ul class="simple">
+<li><p>Prerequisties:</p>
+<ul>
+<li><p>Python 3.6 or above</p></li>
+<li><p>pyscf 2.3.0</p></li>
+<li><p>numpy 1.13.1</p></li>
 </ul>
+</li>
+</ul>
+</section>
+<section id="Compiling-from-source-code">
+<h2><span class="section-number">1.2. </span>Compiling from source code<a class="headerlink" href="#Compiling-from-source-code" title="Link to this heading"></a></h2>
+<ul>
+<li><p>Compile from source</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>git clone https://github.com/ZhaoYilin/pyscf-ita.git
+cd pyscf-ita
+python3 -m pip install -e .
+</pre></div>
+</div>
+</li>
+<li><p>Using pip to install python package on GitHub</p>
+<div class="highlight-none notranslate"><div class="highlight"><pre><span></span>pip install git+https://github.com/ZhaoYilin/pyscf-ita
+</pre></div>
+</div>
+</li>
+</ul>
+</section>
+</section>
+
 
            </div>
           </div>
-          <footer>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="../index.html" class="btn btn-neutral float-left" title="PYSCF-ITA" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="quickstart.html" class="btn btn-neutral float-right" title="2. Quick Start" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
 
   <hr/>
 
