@@ -105,13 +105,6 @@
 <span class="k">class</span> <span class="nc">ITA</span><span class="p">:</span>
 <span class="w">    </span><span class="sa">r</span><span class="sd">&quot;&quot;&quot;Information-Theoretic Approch (ITA) class.</span>
 
-<span class="sd">    Attributes</span>
-<span class="sd">    ----------</span>
-<span class="sd">    grids : Grids</span>
-<span class="sd">        Pyscf Grids instance, by default None.    </span>
-<span class="sd">    itad : ItaDensity</span>
-<span class="sd">        ItaDensity instance, by default None.</span>
-
 <span class="sd">    Examples:</span>
 
 <span class="sd">    &gt;&gt;&gt; mol = gto.M(atom=&#39;H 0 0 0; H 0 0 1.1&#39;)</span>
@@ -124,8 +117,6 @@
 <span class="sd">    &gt;&gt;&gt; ita.grids = grids</span>
 <span class="sd">    &gt;&gt;&gt; ita.build()        </span>
 <span class="sd">    &quot;&quot;&quot;</span>
-    <span class="n">grids</span> <span class="o">=</span> <span class="kc">None</span>
-    <span class="n">itad</span> <span class="o">=</span> <span class="kc">None</span>
     <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span>
         <span class="bp">self</span><span class="p">,</span> 
         <span class="n">method</span><span class="p">,</span> 

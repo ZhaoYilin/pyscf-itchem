@@ -24,9 +24,7 @@ extensions = [
     'sphinx.ext.mathjax',
     'sphinx.ext.coverage',
     'sphinx.ext.viewcode',
-    'sphinxcontrib.bibtex',
-    'nbsphinx',
-    "myst_parser"
+    'nbsphinx'
 ]
 
 templates_path = ['_templates']
@@ -51,6 +49,4 @@ html_logo = './_static/moha.png'
 html_favicon = "_static/moha.ico"
 
 # explicitly dis-/enabling notebook execution
-nbsphinx_execute = "never"
-
-bibtex_bibfiles = ['./developer/refs.bib']
+nbsphinx_execute = "auto"

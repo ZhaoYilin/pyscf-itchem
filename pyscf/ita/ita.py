@@ -19,13 +19,6 @@ __all__ = ["ITA"]
 class ITA:
     r"""Information-Theoretic Approch (ITA) class.
 
-    Attributes
-    ----------
-    grids : Grids
-        Pyscf Grids instance, by default None.    
-    itad : ItaDensity
-        ItaDensity instance, by default None.
-
     Examples:
 
     >>> mol = gto.M(atom='H 0 0 0; H 0 0 1.1')
@@ -38,8 +31,6 @@ class ITA:
     >>> ita.grids = grids
     >>> ita.build()        
     """
-    grids = None
-    itad = None
     def __init__(
         self, 
         method, 
