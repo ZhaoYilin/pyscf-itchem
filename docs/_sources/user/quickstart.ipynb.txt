@@ -86,7 +86,7 @@
     "\n",
     "The Hartree–Fock method is an uncorrelated mean-field theory that offers a qualitative description of chemical systems. Although Hartree–Fock theory is only qualitatively correct, it forms the basis for more accurate models and becomes the cornerstone of ab initio quantum chemistry.\n",
     "\n",
-    "Minimal examples for each type of calculations are shown below."
+    "Minimal examples for HF calculations are shown below."
    ]
   },
   {
