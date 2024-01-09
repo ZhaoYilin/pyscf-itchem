@@ -1,0 +1,333 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../../">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>pyscf.ita.script &mdash; pyscf-ita 0.1.0 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../../_static/pygments.css?v=92fd9be5" />
+      <link rel="stylesheet" type="text/css" href="../../../_static/css/theme.css?v=19f00094" />
+
+  
+    <link rel="shortcut icon" href="../../../_static/moha.ico"/>
+  <!--[if lt IE 9]>
+    <script src="../../../_static/js/html5shiv.min.js"></script>
+  <![endif]-->
+  
+        <script src="../../../_static/jquery.js?v=5d32c60e"></script>
+        <script src="../../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+        <script src="../../../_static/documentation_options.js?v=01f34227"></script>
+        <script src="../../../_static/doctools.js?v=888ff710"></script>
+        <script src="../../../_static/sphinx_highlight.js?v=dc90522c"></script>
+        <script crossorigin="anonymous" integrity="sha256-Ae2Vz/4ePdIu6ZyI/5ZGsYnb+m0JlOmKPjt6XZ9JJkA=" src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.4/require.min.js"></script>
+    <script src="../../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../../index.html" class="icon icon-home">
+            pyscf-ita
+              <img src="../../../_static/moha.png" class="logo" alt="Logo"/>
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">USER DOCUMENTATION:</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../user/installation.html">1. Installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../user/quickstart.html">2. Quick Start</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../user/examples.html">3. Examples</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">DEVELOPER DOCUMENTATION:</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../developer/aim.html">1. Atoms-in-Molecules</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../developer/ita.html">2. Information-Theoretic Approach</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../developer/api.html">3. API</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../../index.html">pyscf-ita</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../../index.html">Module code</a></li>
+      <li class="breadcrumb-item active">pyscf.ita.script</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>Source code for pyscf.ita.script</h1><div class="highlight"><pre>
+<span></span><span class="kn">from</span> <span class="nn">functools</span> <span class="kn">import</span> <span class="n">partial</span>
+<span class="kn">import</span> <span class="nn">numpy</span> <span class="k">as</span> <span class="nn">np</span>
+
+<span class="kn">from</span> <span class="nn">pyscf.ita.log</span> <span class="kn">import</span> <span class="n">Log</span><span class="p">,</span> <span class="n">TimerGroup</span><span class="p">,</span> <span class="n">head_banner</span><span class="p">,</span> <span class="n">foot_banner</span>
+<span class="kn">from</span> <span class="nn">pyscf.ita.aim</span> <span class="kn">import</span> <span class="n">Hirshfeld</span><span class="p">,</span> <span class="n">Becke</span>
+
+<span class="n">__all__</span> <span class="o">=</span> <span class="p">[</span><span class="s2">&quot;batch_compute&quot;</span><span class="p">,</span><span class="s2">&quot;section_compute&quot;</span><span class="p">]</span>
+
+<span class="n">ITA_CODE</span> <span class="o">=</span> <span class="p">{</span>
+    <span class="mi">11</span> <span class="p">:</span> <span class="s1">&#39;shannon_entropy&#39;</span><span class="p">,</span>
+    <span class="mi">12</span> <span class="p">:</span> <span class="s1">&#39;fisher_information&#39;</span><span class="p">,</span>
+    <span class="mi">13</span> <span class="p">:</span> <span class="s1">&#39;alternative_fisher_information&#39;</span><span class="p">,</span>
+    <span class="mi">14</span> <span class="p">:</span> <span class="s1">&#39;renyi_entropy&#39;</span><span class="p">,</span>
+    <span class="mi">15</span> <span class="p">:</span> <span class="s1">&#39;tsallis_entropy&#39;</span><span class="p">,</span>
+    <span class="mi">16</span> <span class="p">:</span> <span class="s1">&#39;onicescu_information&#39;</span><span class="p">,</span>
+    <span class="mi">17</span> <span class="p">:</span> <span class="s1">&#39;GBP_entropy&#39;</span><span class="p">,</span>
+
+    <span class="mi">21</span> <span class="p">:</span> <span class="s1">&#39;relative_shannon_entropy&#39;</span><span class="p">,</span>
+    <span class="mi">22</span> <span class="p">:</span> <span class="s1">&#39;relative_fisher_information&#39;</span><span class="p">,</span>
+    <span class="mi">23</span> <span class="p">:</span> <span class="s1">&#39;relative_alternative_fisher_information&#39;</span><span class="p">,</span>
+    <span class="mi">24</span> <span class="p">:</span> <span class="s1">&#39;relative_renyi_entropy&#39;</span><span class="p">,</span>
+    <span class="mi">25</span> <span class="p">:</span> <span class="s1">&#39;relative_tsallis_entropy&#39;</span><span class="p">,</span>
+    <span class="mi">26</span> <span class="p">:</span> <span class="s1">&#39;relative_onicescu_information&#39;</span><span class="p">,</span>
+
+    <span class="mi">28</span> <span class="p">:</span> <span class="s1">&#39;G1&#39;</span><span class="p">,</span>
+    <span class="mi">29</span> <span class="p">:</span> <span class="s1">&#39;G2&#39;</span><span class="p">,</span>
+    <span class="mi">30</span> <span class="p">:</span> <span class="s1">&#39;G3&#39;</span>
+<span class="p">}</span>
+
+
+<div class="viewcode-block" id="batch_compute">
+<a class="viewcode-back" href="../../../developer/api.html#pyscf.ita.script.batch_compute">[docs]</a>
+<span class="k">def</span> <span class="nf">batch_compute</span><span class="p">(</span>
+    <span class="n">ita</span><span class="p">,</span> 
+    <span class="n">ita_code</span><span class="o">=</span><span class="p">[],</span> 
+    <span class="n">representation</span><span class="o">=</span><span class="s1">&#39;electron density&#39;</span><span class="p">,</span>
+    <span class="n">partition</span><span class="o">=</span><span class="s1">&#39;hirshfeld&#39;</span><span class="p">,</span>    
+    <span class="n">filename</span> <span class="o">=</span> <span class="s1">&#39;ita.log&#39;</span><span class="p">,</span>
+<span class="p">):</span>
+<span class="w">    </span><span class="sa">r</span><span class="sd">&quot;&quot;&quot;ITA batch calcuation.</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    ita : ITA</span>
+<span class="sd">        Instance of ITA class.</span>
+<span class="sd">    ita_code : List[int]</span>
+<span class="sd">        List of ITA code to calculate.</span>
+<span class="sd">    representation : (&#39;electron density&#39; | &#39;shape function&#39; | &#39;atoms in molecules&#39;)</span>
+<span class="sd">        Type of representation, by default &#39;electron density&#39;.</span>
+<span class="sd">    partition : (&#39;hirshfeld&#39; | &#39;bader&#39; | &#39;becke&#39;), optional</span>
+<span class="sd">        Atoms in molecule partition method, by default &#39;hirshfeld&#39;.        </span>
+<span class="sd">    filename : str, optional</span>
+<span class="sd">        File path and name of output, by default &#39;ita.log&#39;</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="n">timer</span> <span class="o">=</span> <span class="n">TimerGroup</span><span class="p">()</span>
+    <span class="n">log</span> <span class="o">=</span> <span class="n">Log</span><span class="p">(</span><span class="s1">&#39;PYSCF-ITA&#39;</span><span class="p">,</span> <span class="n">head_banner</span><span class="p">,</span> <span class="n">foot_banner</span><span class="p">,</span> <span class="n">timer</span><span class="p">)</span>
+    <span class="n">log</span><span class="o">.</span><span class="n">target</span> <span class="o">=</span> <span class="nb">open</span><span class="p">(</span><span class="n">filename</span><span class="p">,</span><span class="s1">&#39;w&#39;</span><span class="p">)</span>
+
+    <span class="c1"># Grid information section</span>
+    <span class="n">grids</span> <span class="o">=</span> <span class="n">ita</span><span class="o">.</span><span class="n">grids</span>
+    <span class="n">log</span><span class="o">.</span><span class="n">hline</span><span class="p">(</span><span class="n">char</span><span class="o">=</span><span class="s1">&#39;=&#39;</span><span class="p">)</span>
+    <span class="n">log</span><span class="o">.</span><span class="n">blank</span><span class="p">()</span>
+    <span class="n">log</span><span class="p">(</span><span class="s1">&#39;SETTING INFORMATION&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">())</span>   
+    <span class="n">log</span><span class="o">.</span><span class="n">hline</span><span class="p">()</span>   
+    <span class="n">log</span><span class="p">(</span><span class="s1">&#39;</span><span class="si">{0:&lt;40s}{1:&lt;20s}</span><span class="s1">&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="s1">&#39;Radial Grid&#39;</span><span class="p">,</span> <span class="n">grids</span><span class="o">.</span><span class="n">radi_method</span><span class="o">.</span><span class="vm">__name__</span><span class="p">,))</span>
+    <span class="n">log</span><span class="p">(</span><span class="s1">&#39;</span><span class="si">{0:&lt;40s}{1:&lt;20s}</span><span class="s1">&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="s1">&#39;Angular Grid&#39;</span><span class="p">,</span> <span class="s1">&#39;Lebedev&#39;</span><span class="p">))</span>
+    <span class="n">log</span><span class="p">(</span><span class="s1">&#39;</span><span class="si">{0:&lt;40s}{1:&lt;20s}</span><span class="s1">&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="s1">&#39;Atomic Grid Fineness&#39;</span><span class="p">,</span> <span class="nb">str</span><span class="p">(</span><span class="n">grids</span><span class="o">.</span><span class="n">atom_grid</span><span class="p">)))</span>
+    <span class="n">log</span><span class="p">(</span><span class="s1">&#39;</span><span class="si">{0:&lt;40s}{1:&lt;20s}</span><span class="s1">&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="s1">&#39;Atom to Molecule Reweight&#39;</span><span class="p">,</span> <span class="n">grids</span><span class="o">.</span><span class="n">becke_scheme</span><span class="o">.</span><span class="vm">__name__</span><span class="p">))</span>
+    <span class="n">log</span><span class="p">(</span><span class="s1">&#39;</span><span class="si">{0:&lt;40s}{1:&lt;20s}</span><span class="s1">&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="s1">&#39;Prune&#39;</span><span class="p">,</span> <span class="nb">str</span><span class="p">(</span><span class="n">grids</span><span class="o">.</span><span class="n">prune</span><span class="p">)))</span>
+    <span class="n">log</span><span class="p">(</span><span class="s1">&#39;</span><span class="si">{0:&lt;40s}{1:&lt;20d}</span><span class="s1">&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="s1">&#39;Number of Grids Points&#39;</span><span class="p">,</span> <span class="n">grids</span><span class="o">.</span><span class="n">size</span><span class="p">))</span>
+    <span class="n">log</span><span class="p">(</span><span class="s1">&#39;</span><span class="si">{0:&lt;40s}{1:&lt;20s}</span><span class="s1">&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="s1">&#39;Representation&#39;</span><span class="p">,</span> <span class="n">representation</span><span class="p">))</span>
+    <span class="n">log</span><span class="p">(</span><span class="s1">&#39;</span><span class="si">{0:&lt;40s}{1:&lt;20s}</span><span class="s1">&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="s1">&#39;Partition&#39;</span><span class="p">,</span> <span class="n">partition</span><span class="p">))</span>
+    <span class="n">log</span><span class="o">.</span><span class="n">blank</span><span class="p">()</span>  
+    <span class="n">log</span><span class="o">.</span><span class="n">hline</span><span class="p">(</span><span class="n">char</span><span class="o">=</span><span class="s1">&#39;=&#39;</span><span class="p">)</span>
+    <span class="n">log</span><span class="o">.</span><span class="n">blank</span><span class="p">()</span>  
+
+    <span class="c1"># ITA Section</span>
+    <span class="k">for</span> <span class="n">code</span> <span class="ow">in</span> <span class="n">ita_code</span><span class="p">:</span>
+        <span class="k">if</span> <span class="n">code</span> <span class="ow">in</span> <span class="n">ITA_CODE</span><span class="o">.</span><span class="n">keys</span><span class="p">():</span>
+            <span class="k">if</span> <span class="n">code</span> <span class="ow">in</span> <span class="p">[</span><span class="mi">14</span><span class="p">,</span><span class="mi">15</span><span class="p">,</span><span class="mi">16</span><span class="p">,</span><span class="mi">24</span><span class="p">,</span><span class="mi">25</span><span class="p">,</span><span class="mi">26</span><span class="p">]:</span>
+                <span class="n">section_compute</span><span class="p">(</span><span class="n">ita</span><span class="p">,</span> <span class="n">code</span><span class="p">,</span> <span class="n">log</span><span class="p">,</span> <span class="n">representation</span><span class="p">,</span> <span class="n">partition</span><span class="p">,</span> <span class="n">n</span><span class="o">=</span><span class="mi">2</span><span class="p">)</span>
+                <span class="n">section_compute</span><span class="p">(</span><span class="n">ita</span><span class="p">,</span> <span class="n">code</span><span class="p">,</span> <span class="n">log</span><span class="p">,</span> <span class="n">representation</span><span class="p">,</span> <span class="n">partition</span><span class="p">,</span> <span class="n">n</span><span class="o">=</span><span class="mi">3</span><span class="p">)</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">section_compute</span><span class="p">(</span><span class="n">ita</span><span class="p">,</span> <span class="n">code</span><span class="p">,</span> <span class="n">log</span><span class="p">,</span> <span class="n">representation</span><span class="p">,</span> <span class="n">partition</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;</span><span class="si">{d}</span><span class="s2"> is not a valid ita code.&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">code</span><span class="p">))</span>
+    <span class="n">log</span><span class="o">.</span><span class="n">print_footer</span><span class="p">()</span></div>
+
+
+<div class="viewcode-block" id="section_compute">
+<a class="viewcode-back" href="../../../developer/api.html#pyscf.ita.script.section_compute">[docs]</a>
+<span class="k">def</span> <span class="nf">section_compute</span><span class="p">(</span>
+    <span class="n">ita</span><span class="p">,</span> 
+    <span class="n">code</span><span class="p">,</span> 
+    <span class="n">log</span><span class="p">,</span> 
+    <span class="n">representation</span><span class="o">=</span><span class="s1">&#39;electron density&#39;</span><span class="p">,</span>
+    <span class="n">partition</span><span class="o">=</span><span class="s1">&#39;hirshfeld&#39;</span><span class="p">,</span>    
+    <span class="o">**</span><span class="n">kwargs</span>
+<span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Function to calculation a single ITA section.</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    ita : ITA</span>
+<span class="sd">        Instance of ITA class.</span>
+<span class="sd">    code : int</span>
+<span class="sd">        Single ITA code.</span>
+<span class="sd">    log : Log</span>
+<span class="sd">        Instance of Log class.</span>
+<span class="sd">    representation : (&#39;electron density&#39; | &#39;shape function&#39; | &#39;atoms in molecules&#39;)</span>
+<span class="sd">        Type of representation, by default &#39;electron density&#39;.</span>
+<span class="sd">    partition : (&#39;hirshfeld&#39; | &#39;bader&#39; | &#39;becke&#39;), optional</span>
+<span class="sd">        Atoms in molecule partition method, by default &#39;hirshfeld&#39;.        </span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">ita_name</span> <span class="o">=</span> <span class="n">ITA_CODE</span><span class="p">[</span><span class="n">code</span><span class="p">]</span>    
+    <span class="n">ita_func</span> <span class="o">=</span> <span class="nb">getattr</span><span class="p">(</span><span class="n">ita</span><span class="p">,</span> <span class="n">ita_name</span><span class="p">)</span>
+    <span class="n">ita_func</span> <span class="o">=</span> <span class="n">partial</span><span class="p">(</span><span class="n">ita_func</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">code</span> <span class="ow">in</span> <span class="p">[</span><span class="mi">14</span><span class="p">,</span><span class="mi">15</span><span class="p">,</span><span class="mi">16</span><span class="p">]:</span>
+        <span class="n">itad_func</span> <span class="o">=</span> <span class="nb">getattr</span><span class="p">(</span><span class="n">ita</span><span class="o">.</span><span class="n">itad</span><span class="p">,</span> <span class="s2">&quot;rho_power&quot;</span><span class="p">)</span>
+    <span class="k">elif</span> <span class="n">code</span> <span class="ow">in</span> <span class="p">[</span><span class="mi">24</span><span class="p">,</span><span class="mi">25</span><span class="p">,</span><span class="mi">26</span><span class="p">]:</span>
+        <span class="n">itad_func</span> <span class="o">=</span> <span class="nb">getattr</span><span class="p">(</span><span class="n">ita</span><span class="o">.</span><span class="n">itad</span><span class="p">,</span> <span class="s2">&quot;relative_rho_power&quot;</span><span class="p">)</span>
+    <span class="k">elif</span> <span class="n">code</span> <span class="ow">in</span> <span class="p">[</span><span class="mi">28</span><span class="p">,</span><span class="mi">29</span><span class="p">,</span><span class="mi">30</span><span class="p">]</span> <span class="ow">and</span> <span class="n">representation</span><span class="o">!=</span><span class="s1">&#39;atoms in molecules&#39;</span><span class="p">:</span>
+        <span class="nb">print</span><span class="p">(</span><span class="s1">&#39;fff&#39;</span><span class="p">,</span><span class="n">representation</span><span class="p">)</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;The G1, G2 and G3 calculation works only in atoms in molecules representation&quot;</span><span class="p">)</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="n">itad_func</span> <span class="o">=</span> <span class="nb">getattr</span><span class="p">(</span><span class="n">ita</span><span class="o">.</span><span class="n">itad</span><span class="p">,</span> <span class="n">ita_name</span><span class="p">)</span>
+    <span class="n">itad_func</span> <span class="o">=</span> <span class="n">partial</span><span class="p">(</span><span class="n">itad_func</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
+
+
+    <span class="n">section_name</span> <span class="o">=</span> <span class="n">ita_name</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="s2">&quot;_&quot;</span><span class="p">,</span> <span class="s2">&quot; &quot;</span><span class="p">)</span><span class="o">.</span><span class="n">upper</span><span class="p">()</span> 
+    <span class="k">if</span> <span class="s1">&#39;n&#39;</span> <span class="ow">in</span> <span class="n">kwargs</span><span class="o">.</span><span class="n">keys</span><span class="p">():</span>
+        <span class="n">section_name</span> <span class="o">=</span> <span class="n">section_name</span> <span class="o">+</span> <span class="s1">&#39; &#39;</span> <span class="o">+</span> <span class="nb">str</span><span class="p">(</span><span class="n">kwargs</span><span class="p">[</span><span class="s1">&#39;n&#39;</span><span class="p">])</span>
+    <span class="n">log</span><span class="o">.</span><span class="n">hline</span><span class="p">(</span><span class="n">char</span><span class="o">=</span><span class="s1">&#39;=&#39;</span><span class="p">)</span>
+    <span class="n">log</span><span class="o">.</span><span class="n">blank</span><span class="p">()</span>
+    <span class="n">log</span><span class="p">(</span><span class="s1">&#39;</span><span class="si">{}</span><span class="s1">&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">section_name</span><span class="p">))</span>      
+    <span class="n">log</span><span class="o">.</span><span class="n">hline</span><span class="p">()</span>
+    <span class="n">log</span><span class="p">(</span><span class="s1">&#39;</span><span class="si">{0:&lt;16s}{1:&lt;16s}{2:&gt;16s}{3:&gt;16s}</span><span class="s1">&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="s1">&#39;Atom id&#39;</span><span class="p">,</span> <span class="s1">&#39;Atom Label&#39;</span><span class="p">,</span> <span class="s1">&#39;Kernel&#39;</span><span class="p">,</span> <span class="s1">&#39;Atomic&#39;</span><span class="p">))</span>
+    <span class="n">log</span><span class="o">.</span><span class="n">hline</span><span class="p">()</span>  
+
+
+    <span class="n">grids</span> <span class="o">=</span> <span class="n">ita</span><span class="o">.</span><span class="n">grids</span>
+    <span class="n">elements</span> <span class="o">=</span> <span class="n">ita</span><span class="o">.</span><span class="n">method</span><span class="o">.</span><span class="n">mol</span><span class="o">.</span><span class="n">elements</span>
+
+    <span class="c1"># Build atoms-in-molecules</span>
+    <span class="k">if</span> <span class="n">partition</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="k">if</span> <span class="n">partition</span><span class="o">.</span><span class="n">lower</span><span class="p">()</span><span class="o">==</span><span class="s1">&#39;hirshfeld&#39;</span><span class="p">:</span>
+            <span class="n">aim</span> <span class="o">=</span> <span class="n">Hirshfeld</span><span class="p">(</span><span class="n">ita</span><span class="o">.</span><span class="n">promoldens</span><span class="p">)</span>
+            <span class="n">omega</span> <span class="o">=</span> <span class="n">aim</span><span class="o">.</span><span class="n">sharing_function</span><span class="p">()</span>
+        <span class="k">elif</span> <span class="n">partition</span><span class="o">.</span><span class="n">lower</span><span class="p">()</span><span class="o">==</span><span class="s1">&#39;becke&#39;</span><span class="p">:</span>
+            <span class="n">aim</span> <span class="o">=</span> <span class="n">Becke</span><span class="p">()</span>
+            <span class="n">omega</span> <span class="o">=</span> <span class="n">aim</span><span class="o">.</span><span class="n">sharing_function</span><span class="p">(</span><span class="n">ita</span><span class="o">.</span><span class="n">method</span><span class="o">.</span><span class="n">mol</span><span class="p">,</span><span class="n">grids</span><span class="p">)</span>
+        <span class="k">elif</span> <span class="n">partition</span><span class="o">.</span><span class="n">lower</span><span class="p">()</span><span class="o">==</span><span class="s1">&#39;bader&#39;</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Not implemented yet.&quot;</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Not a valid partition.&quot;</span><span class="p">)</span>
+
+    <span class="c1"># Section Header</span>
+    <span class="k">if</span> <span class="n">representation</span><span class="o">==</span><span class="s1">&#39;electron density&#39;</span><span class="p">:</span>
+        <span class="n">kernel_sum</span> <span class="o">=</span> <span class="mf">0.</span>
+        <span class="n">atomic_sum</span> <span class="o">=</span> <span class="mf">0.</span>
+        <span class="n">molecular_total</span> <span class="o">=</span> <span class="n">ita_func</span><span class="p">()</span>
+        <span class="k">for</span> <span class="n">atom_id</span><span class="p">,</span> <span class="p">(</span><span class="n">atom_label</span><span class="p">,</span> <span class="n">omega_i</span><span class="p">)</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="nb">zip</span><span class="p">(</span><span class="n">elements</span><span class="p">,</span> <span class="n">omega</span><span class="p">)):</span>
+            <span class="n">itad_i</span> <span class="o">=</span> <span class="n">itad_func</span><span class="p">()</span><span class="o">*</span><span class="n">omega_i</span>
+            <span class="n">kernel_partition</span> <span class="o">=</span> <span class="p">(</span><span class="n">grids</span><span class="o">.</span><span class="n">weights</span> <span class="o">*</span> <span class="n">itad_i</span><span class="p">)</span><span class="o">.</span><span class="n">sum</span><span class="p">()</span>
+            <span class="n">atomic_partition</span> <span class="o">=</span> <span class="n">ita_func</span><span class="p">(</span><span class="n">ita_density</span><span class="o">=</span><span class="n">itad_i</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
+            <span class="n">kernel_sum</span> <span class="o">+=</span> <span class="n">kernel_partition</span>
+            <span class="n">atomic_sum</span> <span class="o">+=</span> <span class="n">atomic_partition</span>
+            <span class="n">log</span><span class="p">(</span><span class="s1">&#39;</span><span class="si">{0:&lt;16d}{1:&lt;16s}{2:&gt;16.8E}{3:&gt;16.8E}</span><span class="s1">&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">atom_id</span><span class="p">,</span> <span class="n">atom_label</span><span class="p">,</span> <span class="n">kernel_partition</span><span class="p">,</span> <span class="n">atomic_partition</span><span class="p">))</span>
+        <span class="n">log</span><span class="p">(</span><span class="s1">&#39;</span><span class="si">{0:&lt;16s}{1:&lt;16s}{2:&gt;16.8E}{3:&gt;16.8E}</span><span class="s1">&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="s1">&#39;Sum:&#39;</span><span class="p">,</span> <span class="s1">&#39;&#39;</span><span class="p">,</span> <span class="n">kernel_sum</span><span class="p">,</span> <span class="n">atomic_sum</span><span class="p">))</span>
+        <span class="n">log</span><span class="o">.</span><span class="n">hline</span><span class="p">()</span>    
+        <span class="n">log</span><span class="p">(</span><span class="s1">&#39;</span><span class="si">{0:&lt;32s}{1:&gt;16.8E}</span><span class="s1">&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="s1">&#39;Molecular ITA:&#39;</span><span class="p">,</span> <span class="n">molecular_total</span><span class="p">))</span>
+        <span class="n">log</span><span class="o">.</span><span class="n">blank</span><span class="p">()</span>  
+        <span class="n">log</span><span class="o">.</span><span class="n">hline</span><span class="p">(</span><span class="n">char</span><span class="o">=</span><span class="s1">&#39;=&#39;</span><span class="p">)</span>
+        <span class="n">log</span><span class="o">.</span><span class="n">blank</span><span class="p">()</span>
+    <span class="k">elif</span> <span class="n">representation</span><span class="o">==</span><span class="s1">&#39;shape function&#39;</span><span class="p">:</span>
+        <span class="n">nelec</span> <span class="o">=</span> <span class="n">ita</span><span class="o">.</span><span class="n">method</span><span class="o">.</span><span class="n">mol</span><span class="o">.</span><span class="n">nelectron</span>
+        <span class="n">kernel_sum</span> <span class="o">=</span> <span class="mf">0.</span>
+        <span class="n">atomic_sum</span> <span class="o">=</span> <span class="mf">0.</span>
+        <span class="n">itad</span> <span class="o">=</span> <span class="n">itad_func</span><span class="p">(</span><span class="n">omega</span><span class="o">=</span><span class="mf">1.</span><span class="o">/</span><span class="n">nelec</span><span class="p">)</span>
+        <span class="n">molecular_total</span> <span class="o">=</span> <span class="n">ita_func</span><span class="p">(</span><span class="n">ita_density</span><span class="o">=</span><span class="n">itad</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
+        <span class="k">for</span> <span class="n">atom_id</span><span class="p">,</span> <span class="p">(</span><span class="n">atom_label</span><span class="p">,</span> <span class="n">omega_i</span><span class="p">)</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="nb">zip</span><span class="p">(</span><span class="n">elements</span><span class="p">,</span> <span class="n">omega</span><span class="p">)):</span>
+            <span class="n">nelec_i</span> <span class="o">=</span> <span class="p">(</span><span class="n">ita</span><span class="o">.</span><span class="n">grids</span><span class="o">.</span><span class="n">weights</span> <span class="o">*</span> <span class="n">ita</span><span class="o">.</span><span class="n">moldens</span><span class="o">.</span><span class="n">density</span><span class="p">()</span> <span class="o">*</span> <span class="n">omega_i</span><span class="p">)</span><span class="o">.</span><span class="n">sum</span><span class="p">()</span>
+            <span class="n">itad_i</span> <span class="o">=</span> <span class="n">itad_func</span><span class="p">(</span><span class="n">omega</span><span class="o">=</span><span class="mf">1.</span><span class="o">/</span><span class="n">nelec_i</span><span class="p">)</span>
+            <span class="n">kernel_partition</span> <span class="o">=</span> <span class="p">(</span><span class="n">grids</span><span class="o">.</span><span class="n">weights</span> <span class="o">*</span> <span class="n">itad_i</span><span class="p">)</span><span class="o">.</span><span class="n">sum</span><span class="p">()</span>
+            <span class="n">atomic_partition</span> <span class="o">=</span> <span class="n">ita_func</span><span class="p">(</span><span class="n">ita_density</span><span class="o">=</span><span class="n">itad_i</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
+            <span class="n">kernel_sum</span> <span class="o">+=</span> <span class="n">kernel_partition</span>
+            <span class="n">atomic_sum</span> <span class="o">+=</span> <span class="n">atomic_partition</span>
+            <span class="n">log</span><span class="p">(</span><span class="s1">&#39;</span><span class="si">{0:&lt;16d}{1:&lt;16s}{2:&gt;16.8E}{3:&gt;16.8E}</span><span class="s1">&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">atom_id</span><span class="p">,</span> <span class="n">atom_label</span><span class="p">,</span> <span class="n">kernel_partition</span><span class="p">,</span> <span class="n">atomic_partition</span><span class="p">))</span>
+        <span class="n">log</span><span class="p">(</span><span class="s1">&#39;</span><span class="si">{0:&lt;16s}{1:&lt;16s}{2:&gt;16.8E}{3:&gt;16.8E}</span><span class="s1">&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="s1">&#39;Sum:&#39;</span><span class="p">,</span> <span class="s1">&#39;&#39;</span><span class="p">,</span> <span class="n">kernel_sum</span><span class="p">,</span> <span class="n">atomic_sum</span><span class="p">))</span>
+        <span class="n">log</span><span class="o">.</span><span class="n">hline</span><span class="p">()</span>    
+        <span class="n">log</span><span class="p">(</span><span class="s1">&#39;</span><span class="si">{0:&lt;32s}{1:&gt;16.8E}</span><span class="s1">&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="s1">&#39;Molecular ITA:&#39;</span><span class="p">,</span> <span class="n">molecular_total</span><span class="p">))</span>
+        <span class="n">log</span><span class="o">.</span><span class="n">blank</span><span class="p">()</span>  
+        <span class="n">log</span><span class="o">.</span><span class="n">hline</span><span class="p">(</span><span class="n">char</span><span class="o">=</span><span class="s1">&#39;=&#39;</span><span class="p">)</span>
+        <span class="n">log</span><span class="o">.</span><span class="n">blank</span><span class="p">()</span>        
+    <span class="k">elif</span> <span class="n">representation</span><span class="o">==</span><span class="s1">&#39;atoms in molecules&#39;</span><span class="p">:</span>
+        <span class="n">kernel_sum</span> <span class="o">=</span> <span class="mf">0.</span>
+        <span class="n">atomic_sum</span> <span class="o">=</span> <span class="mf">0.</span>        
+        <span class="k">for</span> <span class="n">atom_id</span><span class="p">,</span> <span class="p">(</span><span class="n">atom_label</span><span class="p">,</span> <span class="n">omega_i</span><span class="p">)</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="nb">zip</span><span class="p">(</span><span class="n">elements</span><span class="p">,</span> <span class="n">omega</span><span class="p">)):</span>
+            <span class="k">if</span> <span class="n">code</span> <span class="ow">in</span> <span class="p">[</span><span class="mi">22</span><span class="p">,</span><span class="mi">30</span><span class="p">]:</span>
+                <span class="n">prorho_i</span> <span class="o">=</span> <span class="n">ita</span><span class="o">.</span><span class="n">promoldens</span><span class="p">[</span><span class="n">atom_id</span><span class="p">]</span><span class="o">.</span><span class="n">density</span><span class="p">(</span><span class="n">mask</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+                <span class="n">prorho_grad_i</span> <span class="o">=</span> <span class="n">ita</span><span class="o">.</span><span class="n">promoldens</span><span class="p">[</span><span class="n">atom_id</span><span class="p">]</span><span class="o">.</span><span class="n">gradient</span><span class="p">()</span>
+                <span class="n">itad_i</span> <span class="o">=</span> <span class="n">itad_func</span><span class="p">(</span><span class="n">omega</span><span class="o">=</span><span class="n">omega_i</span><span class="p">,</span> <span class="n">prorho</span><span class="o">=</span><span class="n">prorho_i</span><span class="p">,</span> <span class="n">prorho_grad</span><span class="o">=</span><span class="n">prorho_grad_i</span><span class="p">)</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">itad_i</span> <span class="o">=</span> <span class="n">itad_func</span><span class="p">(</span><span class="n">omega</span><span class="o">=</span><span class="n">omega_i</span><span class="p">)</span>
+            <span class="n">kernel_partition</span> <span class="o">=</span> <span class="p">(</span><span class="n">grids</span><span class="o">.</span><span class="n">weights</span> <span class="o">*</span> <span class="n">itad_i</span><span class="p">)</span><span class="o">.</span><span class="n">sum</span><span class="p">()</span>
+            <span class="n">atomic_partition</span> <span class="o">=</span> <span class="n">ita_func</span><span class="p">(</span><span class="n">ita_density</span><span class="o">=</span><span class="n">itad_i</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
+            <span class="n">kernel_sum</span> <span class="o">+=</span> <span class="n">kernel_partition</span>
+            <span class="n">atomic_sum</span> <span class="o">+=</span> <span class="n">atomic_partition</span>
+            <span class="n">log</span><span class="p">(</span><span class="s1">&#39;</span><span class="si">{0:&lt;16d}{1:&lt;16s}{2:&gt;16.8E}{3:&gt;16.8E}</span><span class="s1">&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">atom_id</span><span class="p">,</span> <span class="n">atom_label</span><span class="p">,</span> <span class="n">kernel_partition</span><span class="p">,</span> <span class="n">atomic_partition</span><span class="p">))</span>
+        <span class="n">log</span><span class="p">(</span><span class="s1">&#39;</span><span class="si">{0:&lt;16s}{1:&lt;16s}{2:&gt;16.8E}{3:&gt;16.8E}</span><span class="s1">&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="s1">&#39;Sum:&#39;</span><span class="p">,</span> <span class="s1">&#39;&#39;</span><span class="p">,</span> <span class="n">kernel_sum</span><span class="p">,</span> <span class="n">atomic_sum</span><span class="p">))</span>
+        <span class="n">log</span><span class="o">.</span><span class="n">hline</span><span class="p">()</span>    
+        <span class="n">log</span><span class="p">(</span><span class="s1">&#39;</span><span class="si">{0:&lt;32s}{1:&gt;16.8E}</span><span class="s1">&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="s1">&#39;Molecular ITA:&#39;</span><span class="p">,</span> <span class="n">atomic_sum</span><span class="p">))</span>
+        <span class="n">log</span><span class="o">.</span><span class="n">blank</span><span class="p">()</span>  
+        <span class="n">log</span><span class="o">.</span><span class="n">hline</span><span class="p">(</span><span class="n">char</span><span class="o">=</span><span class="s1">&#39;=&#39;</span><span class="p">)</span>
+        <span class="n">log</span><span class="o">.</span><span class="n">blank</span><span class="p">()</span>     
+    <span class="k">else</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Not valid representation.&quot;</span><span class="p">)</span>      </div>
+
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2023, Yilin Zhao.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>
