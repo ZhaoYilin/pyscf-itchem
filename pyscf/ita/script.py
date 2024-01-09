@@ -152,17 +152,14 @@ def section_compute(
 
     # Section Header
     if representation=='electron density':
-        kernel_sum = 0.
         atomic_sum = 0.
         molecular_total = ita_func()
         for atom_id, (atom_label, omega_i) in enumerate(zip(elements, omega)):
             itad_i = itad_func()*omega_i
-            kernel_partition = (grids.weights * itad_i).sum()
             atomic_partition = ita_func(ita_density=itad_i, **kwargs)
-            kernel_sum += kernel_partition
             atomic_sum += atomic_partition
-            log('{0:<16d}{1:<16s}{2:>16.8E}{3:>16.8E}'.format(atom_id, atom_label, kernel_partition, atomic_partition))
-        log('{0:<16s}{1:<16s}{2:>16.8E}{3:>16.8E}'.format('Sum:', '', kernel_sum, atomic_sum))
+            log('{0:<16d}{1:<16s}{2:>16.8E}'.format(atom_id, atom_label, atomic_partition))
+        log('{0:<16s}{1:<16s}{2:>16.8E}'.format('Sum:', '', atomic_sum))
         log.hline()    
         log('{0:<32s}{1:>16.8E}'.format('Molecular ITA:', molecular_total))
         log.blank()  
@@ -170,26 +167,22 @@ def section_compute(
         log.blank()
     elif representation=='shape function':
         nelec = ita.method.mol.nelectron
-        kernel_sum = 0.
         atomic_sum = 0.
         itad = itad_func(omega=1./nelec)
         molecular_total = ita_func(ita_density=itad, **kwargs)
         for atom_id, (atom_label, omega_i) in enumerate(zip(elements, omega)):
             nelec_i = (ita.grids.weights * ita.moldens.density() * omega_i).sum()
             itad_i = itad_func(omega=1./nelec_i)
-            kernel_partition = (grids.weights * itad_i).sum()
             atomic_partition = ita_func(ita_density=itad_i, **kwargs)
-            kernel_sum += kernel_partition
             atomic_sum += atomic_partition
-            log('{0:<16d}{1:<16s}{2:>16.8E}{3:>16.8E}'.format(atom_id, atom_label, kernel_partition, atomic_partition))
-        log('{0:<16s}{1:<16s}{2:>16.8E}{3:>16.8E}'.format('Sum:', '', kernel_sum, atomic_sum))
+            log('{0:<16d}{1:<16s}{2:>16.8E}'.format(atom_id, atom_label, atomic_partition))
+        log('{0:<16s}{1:<16s}{2:>16.8E}'.format('Sum:', '', atomic_sum))
         log.hline()    
         log('{0:<32s}{1:>16.8E}'.format('Molecular ITA:', molecular_total))
         log.blank()  
         log.hline(char='=')
         log.blank()        
     elif representation=='atoms in molecules':
-        kernel_sum = 0.
         atomic_sum = 0.        
         for atom_id, (atom_label, omega_i) in enumerate(zip(elements, omega)):
             if code in [22,30]:
@@ -198,12 +191,10 @@ def section_compute(
                 itad_i = itad_func(omega=omega_i, prorho=prorho_i, prorho_grad=prorho_grad_i)
             else:
                 itad_i = itad_func(omega=omega_i)
-            kernel_partition = (grids.weights * itad_i).sum()
             atomic_partition = ita_func(ita_density=itad_i, **kwargs)
-            kernel_sum += kernel_partition
             atomic_sum += atomic_partition
-            log('{0:<16d}{1:<16s}{2:>16.8E}{3:>16.8E}'.format(atom_id, atom_label, kernel_partition, atomic_partition))
-        log('{0:<16s}{1:<16s}{2:>16.8E}{3:>16.8E}'.format('Sum:', '', kernel_sum, atomic_sum))
+            log('{0:<16d}{1:<16s}{2:>16.8E}'.format(atom_id, atom_label, atomic_partition))
+        log('{0:<16s}{1:<16s}{2:>16.8E}'.format('Sum:', '', atomic_sum))
         log.hline()    
         log('{0:<32s}{1:>16.8E}'.format('Molecular ITA:', atomic_sum))
         log.blank()  
