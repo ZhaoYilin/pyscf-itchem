@@ -130,7 +130,7 @@ def section_compute(
     log.blank()
     log('{}'.format(section_name))      
     log.hline()
-    log('{0:<16s}{1:<16s}{2:>16s}{3:>16s}'.format('Atom id', 'Atom Label', 'Kernel', 'Atomic'))
+    log('{0:<16s}{1:<16s}{2:>16s}'.format('Atom id', 'Atom Label', 'Atomic'))
     log.hline()  
 
 
