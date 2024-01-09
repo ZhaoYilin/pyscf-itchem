@@ -55,10 +55,11 @@ coverage.xml
 *.log
 *.pot
 
-CMakeCache.txt
-CMakeFiles
-Makefile
-cmake_install.cmake
+# Makefile stuff
+#CMakeCache.txt
+#CMakeFiles
+#Makefile
+#cmake_install.cmake
 
 # Memoization and caching
 tmp/
