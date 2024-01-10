@@ -352,12 +352,25 @@ head_banner = """\
 
 Welcome to PYSCF-ITA Ψ(◉ཅ◉)Ψ!
 
-More information about PYSCF-ITA can be found on this website:
-https://zhaoyilin.github.io/pyscf-ita/
-
 The purpose of this log file is to track the progress and quality of a 
 computation. 
 
+PYSCF-ITA is written and maintained by Yilin Zhao (1), Dongbo Zhao (2)
+Lian Zhuo (3), Meng Li (3), Chunying Rong (3), Shubin Liu (4), 
+Paul W. Ayers (1)
+
+(1) Department of Chemistry and Chemical Biology, Hamilton, Canada
+(2) Institute of Biomedical Research, Yunnan University, Kunming, P.R. China
+(3) College of Chemistry and Chemical Engineering, Hunan Normal University, 
+    Changsha, PR China
+(4) Research Computing Center, University of NorthCarolina, Chapel Hill, North 
+    Carolina, UnitedStates
+
+Acknowledges support from the National Natural Science Foundation of China 
+(Grant No. 22373034 )
+
+More information about PYSCF-ITA can be found on this website:
+https://zhaoyilin.github.io/pyscf-ita/
 ================================================================================"""
 
 
