@@ -101,7 +101,7 @@ class ElectronDensity(np.ndarray):
         tensor : np.ndarray 
             Square matrix mo_coeff or vector mo_occ.
         """        
-        if len(tensor.shape)==3:
+        if tensor.shape[0]==2 and len(tensor.shape)>1:
             if spin=='ab':
                 tensor = tensor[0] + tensor[1]
             elif spin=='a':
@@ -112,7 +112,7 @@ class ElectronDensity(np.ndarray):
                 tensor = tensor[0] - tensor[1]
             else:
                 raise ValueError("Value of spin not valid.")
-        elif len(tensor.shape)==2:
+        else:
             if spin=='ab':
                 tensor = tensor
             elif spin=='a':
@@ -327,12 +327,18 @@ class PartitionDensity(list):
         -------
         obj : PartitionDensity
             Instance of PartitionDensity class.
-        """        
+        """
+        if 'mcscf' in str(method.__class__):
+            from pyscf import mcscf
+            noons, natorbs = mcscf.addons.make_natural_orbitals(method)
+            method.mo_coeff = natorbs
+            method.mo_occ = noons
+
         mol = method.mol
         rdm1 = method.make_rdm1()
         rdm1 = ElectronDensity.spin_reduction(np.array(rdm1), spin)
         mo_coeff = ElectronDensity.spin_reduction(np.array(method.mo_coeff), spin) 
-        mo_occ = ElectronDensity.spin_reduction(np.array(method.mo_occ), spin) 
+        mo_occ = ElectronDensity.spin_reduction(np.array(method.mo_occ), spin)
         mo_coeff = mo_coeff[:,mo_occ>0]
         mo_occ = mo_occ[mo_occ>0]
 

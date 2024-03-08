@@ -1,0 +1,152 @@
+#INFO: **** input file is /Users/yilin/Documents/GitHub/pyscf-ita/examples/h2o2/h2o2.py ****
+from pyscf import gto, scf, dft
+from pyscf.ita.promolecule import ProMolecule
+from pyscf.ita.ita import ITA
+
+filename = 'h2o2.xyz'
+
+# Mole section
+mol = gto.Mole()
+mol.verbose = 4
+mol.output = filename.replace('xyz','out')
+mol.atom = filename
+mol.basis = '6-31G(d)'
+mol.symmetry = 1
+mol.build()
+
+# Mean field section
+mymf = scf.KS(mol)
+mymf.xc = 'B3LYP'
+mymf.level_shift = .4
+mymf.max_cycle = 100
+mymf.conv_tol = 1e-9
+mymf.run()
+
+# build grids
+grids = dft.Grids(mol)
+grids.atom_grid = (99, 590)
+grids.becke_scheme
+grids.prune = True
+grids.build()
+
+# build promolecule
+promol = ProMolecule(mymf)
+promol.pro_charge = {'H':0,'O':0}
+promol.pro_multiplicity = {'H':2,'O':3}
+promol.build()
+
+# build ita
+ita = ITA(mymf, grids)
+ita.rung = [3,3]
+ita.promolecule = promol
+ita.build() 
+
+# batch compute
+ita.batch_compute(ita_code=[11,12,16,17,21,22,26], representation='electron density', partition = 'hirshfeld', filename='ed'+filename.replace('xyz','ita'))
+ita.batch_compute(ita_code=[11,12,28,29,30], representation='atoms in molecules', partition = 'hirshfeld', filename='aim'+filename.replace('xyz','ita'))#INFO: ******************** input file end ********************
+
+
+System: uname_result(system='Darwin', node='YilindeMacBook-Pro.local', release='23.1.0', version='Darwin Kernel Version 23.1.0: Mon Oct  9 21:27:27 PDT 2023; root:xnu-10002.41.9~6/RELEASE_X86_64', machine='x86_64')  Threads 1
+Python 3.11.4 (main, Jul  5 2023, 08:41:25) [Clang 14.0.6 ]
+numpy 1.25.2  scipy 1.11.1
+Date: Wed Mar  6 01:57:28 2024
+PySCF version 2.3.0
+PySCF path  /usr/local/Caskroom/miniconda/base/lib/python3.11/site-packages/pyscf
+
+[CONFIG] conf_file None
+[INPUT] verbose = 4
+[INPUT] num. atoms = 4
+[INPUT] num. electrons = 18
+[INPUT] charge = 0
+[INPUT] spin (= nelec alpha-beta = 2S) = 0
+[INPUT] symmetry 1 subgroup None
+[INPUT] Mole.unit = angstrom
+[INPUT] Symbol           X                Y                Z      unit          X                Y                Z       unit  Magmom
+[INPUT]  1 O     -0.715840000000  -0.113560000000  -0.029660000000 AA   -1.352741549009  -0.214597298706  -0.056049276855 Bohr   0.0
+[INPUT]  2 O      0.778700000000   0.011760000000  -0.055000000000 AA    1.471529733199   0.022223179225  -0.103934936851 Bohr   0.0
+[INPUT]  3 H     -0.798360000000   0.881530000000   0.025000000000 AA   -1.508681748808   1.665850270588   0.047243153114 Bohr   0.0
+[INPUT]  4 H      0.295480000000  -0.067160000000   0.652300000000 AA    0.558376275286  -0.126914006526   1.232668351054 Bohr   0.0
+
+nuclear repulsion = 37.8846798819268
+point group symmetry = C1
+symmetry origin: [0. 0. 0.]
+symmetry axis x: [1. 0. 0.]
+symmetry axis y: [0. 1. 0.]
+symmetry axis z: [0. 0. 1.]
+num. orbitals of irrep A = 32
+number of shells = 16
+number of NR pGTOs = 62
+number of NR cGTOs = 32
+basis = 6-31G(d)
+ecp = {}
+CPU time:         1.43
+
+
+******** <class 'pyscf.dft.rks.RKS'> ********
+method = RKS
+initial guess = minao
+damping factor = 0
+level_shift factor = 0.4
+DIIS = <class 'pyscf.scf.diis.CDIIS'>
+diis_start_cycle = 1
+diis_space = 8
+SCF conv_tol = 1e-09
+SCF conv_tol_grad = None
+SCF max_cycles = 100
+direct_scf = True
+direct_scf_tol = 1e-13
+chkfile to save SCF result = /var/folders/vj/yv3mcs451tq0149c_536c68w0000gn/T/tmp_oyhupvr
+max_memory 4000 MB (current use 0 MB)
+XC library pyscf.dft.libxc version 6.1.0
+    S. Lehtola, C. Steigemann, M. J.T. Oliveira, and M. A.L. Marques.,  SoftwareX 7, 1–5 (2018)
+XC functionals = B3LYP
+    P. J. Stephens, F. J. Devlin, C. F. Chabalowski, and M. J. Frisch.,  J. Phys. Chem. 98, 11623 (1994)
+radial grids: 
+    Treutler-Ahlrichs [JCP 102, 346 (1995); DOI:10.1063/1.469408] (M4) radial grids
+    
+becke partition: Becke, JCP 88, 2547 (1988); DOI:10.1063/1.454033
+pruning grids: <function nwchem_prune at 0x10b6819e0>
+grids dens level: 3
+symmetrized grids: 1
+atomic radii adjust function: <function treutler_atomic_radii_adjust at 0x10b6820c0>
+small_rho_cutoff = 1e-07
+Set gradient conv threshold to 3.16228e-05
+Initial guess from minao.
+tot grids = 48576
+init E= -151.710764627539
+  HOMO = -0.206029197277287  LUMO = 0.062505608949125
+cycle= 1 E= -151.355650133636  delta_E= 0.355  |g|= 0.57  |ddm|= 1.79
+  HOMO = -0.21499588521942  LUMO = 0.401909008442379
+cycle= 2 E= -151.414579387218  delta_E= -0.0589  |g|= 0.318  |ddm|= 0.596
+  HOMO = -0.3057322836871  LUMO = 0.365376804367572
+cycle= 3 E= -151.430938790228  delta_E= -0.0164  |g|= 0.082  |ddm|= 0.184
+  HOMO = -0.300441131300776  LUMO = 0.366310096117603
+cycle= 4 E= -151.432113444779  delta_E= -0.00117  |g|= 0.0209  |ddm|= 0.0497
+  HOMO = -0.298559414699154  LUMO = 0.372066233542766
+cycle= 5 E= -151.432218911577  delta_E= -0.000105  |g|= 0.00744  |ddm|= 0.0193
+  HOMO = -0.300438004779718  LUMO = 0.369796791452864
+cycle= 6 E= -151.432241595551  delta_E= -2.27e-05  |g|= 0.0026  |ddm|= 0.0094
+  HOMO = -0.300329353639687  LUMO = 0.369861262378219
+cycle= 7 E= -151.432248479174  delta_E= -6.88e-06  |g|= 0.00146  |ddm|= 0.00595
+  HOMO = -0.300372243845212  LUMO = 0.369842938219667
+cycle= 8 E= -151.432251112867  delta_E= -2.63e-06  |g|= 0.000843  |ddm|= 0.00379
+  HOMO = -0.300380841631481  LUMO = 0.369846697056151
+cycle= 9 E= -151.432252075139  delta_E= -9.62e-07  |g|= 0.000502  |ddm|= 0.00231
+  HOMO = -0.300379101381191  LUMO = 0.369842831764901
+cycle= 10 E= -151.432252417285  delta_E= -3.42e-07  |g|= 0.000301  |ddm|= 0.00139
+  HOMO = -0.300382674444897  LUMO = 0.369839581102439
+cycle= 11 E= -151.43225253518  delta_E= -1.18e-07  |g|= 0.000179  |ddm|= 0.000814
+  HOMO = -0.300385046454665  LUMO = 0.369839465252217
+cycle= 12 E= -151.432252574884  delta_E= -3.97e-08  |g|= 0.00011  |ddm|= 0.000472
+  HOMO = -0.300383990855352  LUMO = 0.369839813337006
+cycle= 13 E= -151.432252588483  delta_E= -1.36e-08  |g|= 6.53e-05  |ddm|= 0.000273
+  HOMO = -0.300383909207917  LUMO = 0.369839831518216
+cycle= 14 E= -151.432252593114  delta_E= -4.63e-09  |g|= 3.88e-05  |ddm|= 0.000158
+  HOMO = -0.300384093645369  LUMO = 0.369839903220571
+cycle= 15 E= -151.432252594702  delta_E= -1.59e-09  |g|= 2.32e-05  |ddm|= 9.23e-05
+  HOMO = -0.300384055168687  LUMO = 0.369839842263416
+cycle= 16 E= -151.43225259525  delta_E= -5.47e-10  |g|= 1.37e-05  |ddm|= 5.37e-05
+  HOMO = -0.300382963817053  LUMO = -0.0301595425245625
+Extra cycle  E= -151.432252595501  delta_E= -2.51e-10  |g|= 1.22e-05  |ddm|= 6.35e-05
+converged SCF energy = -151.432252595501
+tot grids = 233640

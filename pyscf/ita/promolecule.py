@@ -166,8 +166,12 @@ class ProMolecule:
                 from pyscf import cc
                 method_func = getattr(cc, method.__class__.__name__)              
             elif 'CI'.lower() in method.__class__.__name__.lower():
-                from pyscf import ci  
-                method_func = getattr(ci, method.__class__.__name__)              
+                if 'fci' in str(method):
+                    from pyscf import fci
+                    method_func = getattr(fci, 'FCI')    
+                else:          
+                    from pyscf import ci  
+                    method_func = getattr(ci, method.__class__.__name__)              
             else:
                 raise TypeError("Method type not supported.")  
             

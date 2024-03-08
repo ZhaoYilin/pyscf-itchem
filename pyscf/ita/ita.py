@@ -691,7 +691,7 @@ class ITA:
         if grids_weights is None:
             grids_weights = self.grids.weights
         if ita_density is None:
-            ita_density = self.itad.G2()
+            ita_density = self.itad.G3()
 
         result = (grids_weights * ita_density).sum()
         return result            

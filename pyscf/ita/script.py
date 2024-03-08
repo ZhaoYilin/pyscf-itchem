@@ -50,7 +50,6 @@ def batch_compute(
     filename : str, optional
         File path and name of output, by default 'ita.log'
     """
-
     timer = TimerGroup()
     log = Log('PYSCF-ITA', head_banner, foot_banner, timer)
     log.target = open(filename,'w')
@@ -73,7 +72,6 @@ def batch_compute(
     log.hline(char='=')
     log.blank()  
 
-    # ITA Section
     for code in ita_code:
         if code in ITA_CODE.keys():
             if code in [14,15,16,24,25,26]:
@@ -82,7 +80,7 @@ def batch_compute(
             else:
                 section_compute(ita, code, log, representation, partition)
         else:
-            raise ValueError("{d} is not a valid ita code.".format(code))
+            raise ValueError("{d} is not a valid ita code.".format(code))        
     log.print_footer()
 
 def section_compute(
@@ -116,7 +114,6 @@ def section_compute(
     elif code in [24,25,26]:
         itad_func = getattr(ita.itad, "relative_rho_power")
     elif code in [28,29,30] and representation!='atoms in molecules':
-        print('fff',representation)
         raise ValueError("The G1, G2 and G3 calculation works only in atoms in molecules representation")
     else:
         itad_func = getattr(ita.itad, ita_name)
@@ -188,7 +185,7 @@ def section_compute(
             if code in [22,30]:
                 prorho_i = ita.promoldens[atom_id].density(mask=True)
                 prorho_grad_i = ita.promoldens[atom_id].gradient()
-                itad_i = itad_func(omega=omega_i, prorho=prorho_i, prorho_grad=prorho_grad_i)
+                itad_i = itad_func(omega=omega_i, prorho=prorho_i, prorho_grad=prorho_grad_i)                          
             else:
                 itad_i = itad_func(omega=omega_i)
             atomic_partition = ita_func(ita_density=itad_i, **kwargs)
@@ -201,4 +198,4 @@ def section_compute(
         log.hline(char='=')
         log.blank()     
     else:
-        raise ValueError("Not valid representation.")      
+        raise ValueError("Not valid representation.")    
