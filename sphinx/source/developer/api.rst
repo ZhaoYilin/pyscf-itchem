@@ -17,6 +17,22 @@ pyscf.ita.aim module
    :undoc-members:
    :show-inheritance:
 
+pyscf.ita.eval_dens module
+--------------------------
+
+.. automodule:: pyscf.ita.eval_dens
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+pyscf.ita.eval_odm module
+-------------------------
+
+.. automodule:: pyscf.ita.eval_odm
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
 pyscf.ita.dens module
 ---------------------
 
@@ -26,7 +42,7 @@ pyscf.ita.dens module
    :show-inheritance:
 
 pyscf.ita.ked module
----------------------
+--------------------
 
 .. automodule:: pyscf.ita.ked
    :members:
@@ -45,6 +61,22 @@ pyscf.ita.ita module
 --------------------
 
 .. automodule:: pyscf.ita.ita
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+pyscf.ita.ea module
+-------------------
+
+.. automodule:: pyscf.ita.ea
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+pyscf.ita.orb_entanglement module
+---------------------------------
+
+.. automodule:: pyscf.ita.orb_entanglement
    :members:
    :undoc-members:
    :show-inheritance:

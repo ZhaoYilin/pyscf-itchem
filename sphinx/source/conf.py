@@ -50,3 +50,9 @@ html_favicon = "_static/moha.ico"
 
 # explicitly dis-/enabling notebook execution
 nbsphinx_execute = "auto"
+
+
+mathjax3_config = {
+    "jax": ["input/TeX","output/HTML-CSS"],
+    "displayAlign": "left"
+}

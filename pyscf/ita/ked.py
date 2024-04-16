@@ -16,41 +16,11 @@ class KineticEnergyDensity:
         ----------
         dens : ElectronDensity, optional
             ElectronDensity instance for molecule, by default None.
-        orbdens : PartitionDensity, optional
-            PartitionDensity instance for orbitals, by default None.
+        orbdens : List[ElectronDensity], optional
+            List of ElectronDensity instance for orbitals, by default None.
         """
         self.dens = dens 
         self.orbdens = orbdens 
-
-    def positive_definite(
-        self, 
-        tau=None,
-        omega=None
-    ):
-        r"""Positive definite or Lagrangian kinetic energy density defined as:
-
-        .. math::
-           \tau_\text{PD} (\mathbf{r}) =
-           \frac{1}{2} \sum_i^N n_i \rvert \nabla \phi_i (\mathbf{r}) \lvert^2
-
-        Parameters
-        ----------
-        rho : np.ndarray((N,), dtype=float), optional
-            Electron density on grid of N points, by default None.
-        omega : np.ndarray((N,), dtype=float), optional
-            Sharing function of single atom, by default None.
-
-        Returns
-        -------
-        ked : np.ndarray((N,), dtype=float)
-            Kinetic energy density on grid of N points.
-        """        
-        if tau is None: 
-            tau = self.dens.tau() 
-        if omega is not None:
-            ked = tau*omega 
-
-        return ked
 
     def general(
         self, 
@@ -186,8 +156,8 @@ class KineticEnergyDensity:
         """
         if rho is None: 
             rho = self.dens.density(mask=True)        
-        if rho_grad is None: 
-            rho_grad = self.dens.gradient_norm()
+        if rho_grad_norm is None: 
+            rho_grad_norm = self.dens.gradient_norm()
         if omega is not None:
             rho = rho*omega
             rho_grad_norm = rho_grad_norm*omega

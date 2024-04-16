@@ -1,30 +1,22 @@
 from functools import partial
 import numpy as np
 
-from pyscf.ita.log import Log, TimerGroup, head_banner, foot_banner
+from pyscf.ita.utils.log import Log, TimerGroup, head_banner, foot_banner
 from pyscf.ita.aim import Hirshfeld, Becke
 
 __all__ = ["batch_compute","section_compute"]
 
 ITA_CODE = {
-    11 : 'shannon_entropy',
-    12 : 'fisher_information',
-    13 : 'alternative_fisher_information',
-    14 : 'renyi_entropy',
-    15 : 'tsallis_entropy',
-    16 : 'onicescu_information',
-    17 : 'GBP_entropy',
-
-    21 : 'relative_shannon_entropy',
-    22 : 'relative_fisher_information',
-    23 : 'relative_alternative_fisher_information',
-    24 : 'relative_renyi_entropy',
-    25 : 'relative_tsallis_entropy',
-    26 : 'relative_onicescu_information',
-
-    28 : 'G1',
-    29 : 'G2',
-    30 : 'G3'
+    1 : 'shannon_entropy',
+    2 : 'fisher_information',
+    3 : 'alternative_fisher_information',
+    4 : 'renyi_entropy',
+    5 : 'tsallis_entropy',
+    6 : 'onicescu_information',
+    7 : 'GBP_entropy',
+    8 : 'G1',
+    9 : 'G2',
+    10 : 'G3'
 }
 
 
@@ -32,7 +24,7 @@ def batch_compute(
     ita, 
     ita_code=[], 
     representation='electron density',
-    partition='hirshfeld',    
+    partition=None,    
     filename = 'ita.log',
 ):
     r"""ITA batch calcuation.
@@ -45,8 +37,8 @@ def batch_compute(
         List of ITA code to calculate.
     representation : ('electron density' | 'shape function' | 'atoms in molecules')
         Type of representation, by default 'electron density'.
-    partition : ('hirshfeld' | 'bader' | 'becke'), optional
-        Atoms in molecule partition method, by default 'hirshfeld'.        
+    partition : (None | 'hirshfeld' | 'bader' | 'becke'), optional
+        Atoms in molecule partition method, by default None.        
     filename : str, optional
         File path and name of output, by default 'ita.log'
     """
@@ -66,15 +58,16 @@ def batch_compute(
     log('{0:<40s}{1:<20s}'.format('Atom to Molecule Reweight', grids.becke_scheme.__name__))
     log('{0:<40s}{1:<20s}'.format('Prune', str(grids.prune)))
     log('{0:<40s}{1:<20d}'.format('Number of Grids Points', grids.size))
+    log('{0:<40s}{1:<20s}'.format('Category', ita.category))
     log('{0:<40s}{1:<20s}'.format('Representation', representation))
-    log('{0:<40s}{1:<20s}'.format('Partition', partition))
+    log('{0:<40s}{1:<20s}'.format('Partition', str(partition)))
     log.blank()  
     log.hline(char='=')
     log.blank()  
 
     for code in ita_code:
         if code in ITA_CODE.keys():
-            if code in [14,15,16,24,25,26]:
+            if code in [4,5,6]:
                 section_compute(ita, code, log, representation, partition, n=2)
                 section_compute(ita, code, log, representation, partition, n=3)
             else:
@@ -88,7 +81,7 @@ def section_compute(
     code, 
     log, 
     representation='electron density',
-    partition='hirshfeld',    
+    partition=None,    
     **kwargs
 ):
     """Function to calculation a single ITA section.
@@ -103,17 +96,15 @@ def section_compute(
         Instance of Log class.
     representation : ('electron density' | 'shape function' | 'atoms in molecules')
         Type of representation, by default 'electron density'.
-    partition : ('hirshfeld' | 'bader' | 'becke'), optional
-        Atoms in molecule partition method, by default 'hirshfeld'.        
+    partition : (None | 'hirshfeld' | 'bader' | 'becke'), optional
+        Atoms in molecule partition method, by default None.        
     """
     ita_name = ITA_CODE[code]    
     ita_func = getattr(ita, ita_name)
     ita_func = partial(ita_func, **kwargs)
-    if code in [14,15,16]:
+    if code in [4,5,6]:
         itad_func = getattr(ita.itad, "rho_power")
-    elif code in [24,25,26]:
-        itad_func = getattr(ita.itad, "relative_rho_power")
-    elif code in [28,29,30] and representation!='atoms in molecules':
+    elif code in [8,9,10] and representation!='atoms in molecules':
         raise ValueError("The G1, G2 and G3 calculation works only in atoms in molecules representation")
     else:
         itad_func = getattr(ita.itad, ita_name)
@@ -126,9 +117,6 @@ def section_compute(
     log.hline(char='=')
     log.blank()
     log('{}'.format(section_name))      
-    log.hline()
-    log('{0:<16s}{1:<16s}{2:>16s}'.format('Atom id', 'Atom Label', 'Atomic'))
-    log.hline()  
 
 
     grids = ita.grids
@@ -136,27 +124,35 @@ def section_compute(
 
     # Build atoms-in-molecules
     if partition is not None:
+        log.hline()
+        log('{0:<16s}{1:<16s}{2:>16s}'.format('Atom id', 'Atom Label', 'Atomic'))
+        log.hline()  
         if partition.lower()=='hirshfeld':
-            aim = Hirshfeld(ita.promoldens)
+            promolecule = ita.promolecule
+            prodens = promolecule.one_electron_density(grids, deriv=0)            
+            aim = Hirshfeld(prodens)
             omega = aim.sharing_function()
         elif partition.lower()=='becke':
             aim = Becke()
-            omega = aim.sharing_function(ita.method.mol,grids)
+            omega = aim.sharing_function(ita.method.mol,grids)            
         elif partition.lower()=='bader':
-            raise ValueError("Not implemented yet.")
+            raise NotImplemented
         else:
             raise ValueError("Not a valid partition.")
 
     # Section Header
     if representation=='electron density':
-        atomic_sum = 0.
-        molecular_total = ita_func()
-        for atom_id, (atom_label, omega_i) in enumerate(zip(elements, omega)):
-            itad_i = itad_func()*omega_i
-            atomic_partition = ita_func(ita_density=itad_i, **kwargs)
-            atomic_sum += atomic_partition
-            log('{0:<16d}{1:<16s}{2:>16.8E}'.format(atom_id, atom_label, atomic_partition))
-        log('{0:<16s}{1:<16s}{2:>16.8E}'.format('Sum:', '', atomic_sum))
+        if partition is None:
+            molecular_total = ita_func()
+        else:
+            atomic_sum = 0.
+            molecular_total = ita_func()
+            for atom_id, (atom_label, omega_i) in enumerate(zip(elements, omega)):
+                itad_i = itad_func()*omega_i
+                atomic_partition = ita_func(ita_density=itad_i, **kwargs)
+                atomic_sum += atomic_partition
+                log('{0:<16d}{1:<16s}{2:>16.8E}'.format(atom_id, atom_label, atomic_partition))
+            log('{0:<16s}{1:<16s}{2:>16.8E}'.format('Sum:', '', atomic_sum))
         log.hline()    
         log('{0:<32s}{1:>16.8E}'.format('Molecular ITA:', molecular_total))
         log.blank()  
@@ -182,9 +178,9 @@ def section_compute(
     elif representation=='atoms in molecules':
         atomic_sum = 0.        
         for atom_id, (atom_label, omega_i) in enumerate(zip(elements, omega)):
-            if code in [22,30]:
-                prorho_i = ita.promoldens[atom_id].density(mask=True)
-                prorho_grad_i = ita.promoldens[atom_id].gradient()
+            if code in [2,10]:
+                prorho_i = ita.prodens[atom_id].density(mask=True)
+                prorho_grad_i = ita.prodens[atom_id].gradient()
                 itad_i = itad_func(omega=omega_i, prorho=prorho_i, prorho_grad=prorho_grad_i)                          
             else:
                 itad_i = itad_func(omega=omega_i)

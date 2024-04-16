@@ -5,14 +5,10 @@ References
 ----------
 The following references are for the atoms-in-molecules module.
 """
-
 import numpy as np
-from pyscf import dft
 
-from pyscf.ita.dens import ElectronDensity, PartitionDensity
+from pyscf.ita.dens import OneElectronDensity, TwoElectronDensity
 from pyscf.ita.ked import KineticEnergyDensity
-from pyscf.ita.itad import ItaDensity
-from pyscf.ita.promolecule import ProMolecule
 
 __all__ = ["ITA"]
 
@@ -29,17 +25,18 @@ class ITA:
     >>> ita = ITA()
     >>> ita.method = mf
     >>> ita.grids = grids
+    >>> ita.category = 'regular'    
     >>> ita.build()        
     """
     def __init__(
         self, 
         method, 
-        grids, 
-        rung=[3,3], 
-        spin='ab',
-        promolecule=None,
+        grids,
+        category='regular',
+        rung=3, 
+        promolecule=None
     ):
-        r""" Initialize a instance.
+        r"""Initialize a instance.
 
         Parameters
         ----------
@@ -47,27 +44,24 @@ class ITA:
             Pyscf scf method or post-scf method instance.
         grids : Grids
             Pyscf Grids instance.
-        rung : List[int, int]
-            List of molecule and promolecule derivate+1 level, by default [3,3].           
-        spin: ('ab' | 'a' | 'b' | 'm')
-            Type of density to compute; either total, alpha-spin, beta-spin, or magnetization density,
-            by default='ab'    
+        rung : int
+            Density derivate+1 level, by default 3,.           
         promolecule : ProMolecule, optional
             ProMolecule instance, by default None.
         """
         self.method = method
         self.grids = grids  
+        self.categrory = category
         self.rung = rung
-        self.spin = spin
         self.promolecule = promolecule
         
     def build(
         self, 
         method=None, 
         grids=None,
+        category=None,
         rung=None, 
-        spin=None,
-        promolecule=None,
+        promolecule=None
     ):
         r"""Method to build the class.
 
@@ -77,11 +71,8 @@ class ITA:
             Pyscf scf method or post-scf method instance, by deafult None.
         grids : Grids, optional
             Pyscf Grids instance, by deafult None.
-        rung : List[int, int], optional
-            List of molecule and promolecule derivate+1 level, by default [3,0].           
-        spin: ('ab' | 'a' | 'b' | 'm'), optional
-            Type of density to compute; either total, alpha-spin, beta-spin, or magnetization density,
-            by default None.    
+        rung : int
+            Density derivate+1 level, by default 3,.           
         promolecule : ProMolecule, optional
             ProMolecule instance, by default None.
         """
@@ -89,35 +80,61 @@ class ITA:
             method = self.method
         if grids is None:
             grids = self.grids
+        if category is None:
+            category = self.category
         if rung is None:
             rung = self.rung
-        if spin is None:
-            spin = self.spin
         if promolecule is None:
             promolecule = self.promolecule
 
         # Build molecule electron density.
-        moldens = ElectronDensity.build(method, grids.coords, spin=spin, deriv=rung[0]-1)
-        self.moldens = moldens
-
-        # Build kinetic energy electron density.
-        if rung[0]==3:
-            orbdens = PartitionDensity.orbital(method, grids.coords, spin=spin, deriv=1)
-            self.orbdens = orbdens
-            molkeds = KineticEnergyDensity(moldens,orbdens)
-            self.molkeds = molkeds
-
-        # Build promolecule electron density
-        if promolecule is not None:
-            promoldens = promolecule.electron_density(grids.coords, spin=spin, deriv=rung[1]-1)
+        if category=='regular':
+            from pyscf.ita.itad import ItaDensity
+            dens = OneElectronDensity.build(method, grids, deriv=rung-1)
+            if rung==3:
+                orbdens = OneElectronDensity.orbital_partition(method, grids, deriv=1)
+                keds = KineticEnergyDensity(dens,orbdens)
+                itad = ItaDensity(dens, keds)
+            else:
+                itad = ItaDensity(dens)
+        elif category=='joint':
+            from pyscf.ita.itad import JointItaDensity
+            dens = TwoElectronDensity.build(method, grids, deriv=rung-1)
+            if rung==3:
+                orbdens = TwoElectronDensity.orbital_partition(method, grids, deriv=1)
+                keds = KineticEnergyDensity(dens,orbdens)
+                itad = JointItaDensity(dens, keds)
+            else:
+                itad = JointItaDensity(dens)
+        elif category=='conditional':
+            from pyscf.ita.itad import ConditionalItaDensity
+            dens = TwoElectronDensity.build(method, grids, deriv=rung-1)
+            if rung==3:
+                orbdens = TwoElectronDensity.orbital_partition(method, grids, deriv=1)
+                keds = KineticEnergyDensity(dens,orbdens)
+                itad = ConditionalItaDensity(dens, keds)
+            else:
+                itad = ConditionalItaDensity(dens)
+        elif category=='relative':
+            from pyscf.ita.itad import RelativeItaDensity
+            dens = OneElectronDensity.build(method, grids, deriv=rung-1)  
+            prodens = promolecule.one_electron_density(grids, deriv=rung-1)
+            self.dens = dens
+            self.prodens = prodens
+            itad = RelativeItaDensity(dens,prodens)
+        elif category=='mutual':
+            from pyscf.ita.itad import MutualItaDensity
+            nelec = method.mol.nelectron
+            onedens = OneElectronDensity.build(method, grids, deriv=rung-1) 
+            onedens = onedens/nelec
+            twodens = TwoElectronDensity.build(method, grids, deriv=rung-1)
+            twodens = twodens/(nelec*(nelec-1))
+            itad = MutualItaDensity(onedens,twodens)
         else:
-            promoldens = None
-        self.promoldens = promoldens
-
+            raise ValueError("Not a valid category.")
+        
         # Build ITA density
-        itad = ItaDensity(moldens, promoldens, molkeds)
         self.itad = itad
-
         return self
 
     def batch_compute(
@@ -172,7 +189,10 @@ class ITA:
         if ita_density is None:
             ita_density = self.itad.rho_power(n=n)
 
-        result = (grids_weights * ita_density).sum()
+        if len(ita_density.shape)==1:
+            result = np.einsum("g, g -> ", grids_weights, ita_density)
+        if len(ita_density.shape)==2:
+            result = np.einsum("g, h, gh -> ", grids_weights, grids_weights, ita_density)
         return result
 
     def shannon_entropy(
@@ -202,7 +222,10 @@ class ITA:
         if ita_density is None:
             ita_density = self.itad.shannon_entropy()
 
-        result = (grids_weights * ita_density).sum()
+        if len(ita_density.shape)==1:
+            result = np.einsum("g, g -> ", grids_weights, ita_density)
+        if len(ita_density.shape)==2:
+            result = np.einsum("g, h, gh -> ", grids_weights, grids_weights, ita_density)
         return result
 
     def fisher_information(
@@ -232,7 +255,10 @@ class ITA:
         if ita_density is None:
             ita_density = self.itad.fisher_information()
 
-        result = (grids_weights * ita_density).sum()
+        if len(ita_density.shape)==1:
+            result = np.einsum("g, g -> ", grids_weights, ita_density)
+        if len(ita_density.shape)==2:
+            result = np.einsum("g, h, gh -> ", grids_weights, grids_weights, ita_density)
         return result
 
     def alternative_fisher_information(
@@ -262,7 +288,10 @@ class ITA:
         if ita_density is None:
             ita_density = self.itad.alternative_fisher_information()
 
-        result = (grids_weights * ita_density).sum()
+        if len(ita_density.shape)==1:
+            result = np.einsum("g, g -> ", grids_weights, ita_density)
+        if len(ita_density.shape)==2:
+            result = np.einsum("g, h, gh -> ", grids_weights, grids_weights, ita_density)
         return result
     
     def GBP_entropy(
@@ -293,7 +322,10 @@ class ITA:
         if ita_density is None:
             ita_density = self.itad.GBP_entropy()
 
-        result = (grids_weights * ita_density).sum()
+        if len(ita_density.shape)==1:
+            result = np.einsum("g, g -> ", grids_weights, ita_density)
+        if len(ita_density.shape)==2:
+            result = np.einsum("g, h, gh -> ", grids_weights, grids_weights, ita_density)
         return result 
 
     def renyi_entropy(
@@ -326,7 +358,11 @@ class ITA:
         if ita_density is None:
             ita_density = self.itad.rho_power(n)
             
-        result = (1/(1-n))*np.log10((grids_weights * ita_density).sum())
+        if len(ita_density.shape)==1:
+            result = np.einsum("g, g -> ", grids_weights, ita_density)
+        if len(ita_density.shape)==2:
+            result = np.einsum("g, h, gh -> ", grids_weights, grids_weights, ita_density)
+        result = (1/(1-n))*np.log10(result)
         return result
     
     def tsallis_entropy(
@@ -359,7 +395,11 @@ class ITA:
         if ita_density is None:
             ita_density = self.itad.rho_power(n)
 
-        result = (1/(n-1))*(1-(grids_weights * ita_density).sum())
+        if len(ita_density.shape)==1:
+            result = np.einsum("g, g -> ", grids_weights, ita_density)
+        if len(ita_density.shape)==2:
+            result = np.einsum("g, h, gh -> ", grids_weights, grids_weights, ita_density)
+        result = (1/(n-1))*(1-result)
         return result 
     
     def onicescu_information(
@@ -392,207 +432,12 @@ class ITA:
         if ita_density is None:
             ita_density = self.itad.rho_power(n)
 
-        result = (1/(n-1))*(grids_weights * ita_density).sum()        
+        if len(ita_density.shape)==1:
+            result = np.einsum("g, g -> ", grids_weights, ita_density)
+        if len(ita_density.shape)==2:
+            result = np.einsum("g, h, gh -> ", grids_weights, grids_weights, ita_density)
+        result = (1/(n-1))*result
         return result
-
-    def relative_shannon_entropy(
-        self, 
-        grids_weights=None, 
-        ita_density=None
-    ):
-        r"""Relative Shannon entropy :math:`S^r_S` defined as:
-
-        .. math::
-            S^r_S = \int \rho(\mathbf{r})\ln \frac{\rho(\mathbf{r})}{\rho_0(\mathbf{r})} d\mathbf{r}
-
-        Parameters
-        ----------
-        grids_weights : np.ndarray((N,), dtype=float), optional
-            Grids weights on N points, by default None.
-        ita_density : np.ndarray((N,), dtype=float), optional
-            ITA density, by default None.
-
-        Returns
-        -------
-        result : float
-            Scalar ITA result.
-        """           
-        if grids_weights is None:
-            grids_weights = self.grids.weights
-        if ita_density is None:
-            ita_density = self.itad.relative_shannon_entropy()
-
-        result = (grids_weights * ita_density).sum()
-        return result
-
-    def relative_fisher_information(
-        self, 
-        grids_weights=None, 
-        ita_density=None
-    ):
-        r"""Relative Fisher information defined as:
-
-        .. math::
-            {}^r_F I(\mathbf{r})
-            = \int \rho(\mathbf{r}) 
-            \left\vert 
-            \frac{\nabla \rho(\mathbf{r})}{\rho(\mathbf{r})} 
-            -\frac{\nabla \rho_0(\mathbf{r})}{\rho_0(\mathbf{r})} 
-            \right\vert^2 dr
-
-        Parameters
-        ----------
-        grids_weights : np.ndarray((N,), dtype=float), optional
-            Grids weights on N points, by default None.
-        ita_density : np.ndarray((N,), dtype=float), optional
-            ITA density, by default None.
-
-        Returns
-        -------
-        result : float
-            Scalar ITA result.
-        """           
-        if grids_weights is None:
-            grids_weights = self.grids.weights
-        if ita_density is None:
-            ita_density = self.itad.relative_fisher_information()
-
-        result = (grids_weights * ita_density).sum()
-        return result
-
-    def relative_alternative_fisher_information(
-        self, 
-        grids_weights=None, 
-        ita_density=None
-    ):
-        r"""Relative alternative Fisher information defined as:
-
-        .. math::
-            {}^r_F I^{\prime}(\mathbf{r}) 
-            = \int \nabla^2 \rho(\mathbf{r}) 
-            \ln \frac{\rho(\mathbf{r})}{\rho_0(\mathbf{r})}  dr
-
-        Parameters
-        ----------
-        grids_weights : np.ndarray((N,), dtype=float), optional
-            Grids weights on N points, by default None.
-        ita_density : np.ndarray((N,), dtype=float), optional
-            ITA density, by default None.
-
-        Returns
-        -------
-        result : float
-            Scalar ITA result.
-        """           
-        if grids_weights is None:
-            grids_weights = self.grids.weights
-        if ita_density is None:
-            ita_density = self.itad.relative_alternative_fisher_information()
-
-        result = (grids_weights * ita_density).sum()
-        return result
-
-    def relative_renyi_entropy(
-        self, 
-        n=2, 
-        grids_weights=None, 
-        ita_density=None
-    ):
-        r"""Relative Renyi entropy :math:`R^r_n` defined as:
-
-        .. math::
-            R^r_n = \frac{1}{1-n} \ln 
-                \left[ \int \frac{\rho^n(\mathbf{r})}{\rho^{n-1}_0(\mathbf{r})} d\mathbf{r} \right]
-
-        Parameters
-        ----------
-        n : int, optional
-            Order of the relative Renyi entropy, by default 2.
-        grids_weights : np.ndarray((N,), dtype=float), optional
-            Grids weights on N points, by default None.
-        ita_density : np.ndarray((N,), dtype=float), optional
-            ITA density, by default None.
-
-        Returns
-        -------
-        result : float
-            Scalar ITA result.
-        """           
-        if grids_weights is None:
-            grids_weights = self.grids.weights
-        if ita_density is None:
-            ita_density = self.itad.relative_rho_power(n)
-
-        result = (1/(1-n))*np.log10((grids_weights * ita_density).sum())
-        return result
-
-    def relative_tsallis_entropy(
-        self, 
-        n=2, 
-        grids_weights=None, 
-        ita_density=None
-    ):
-        r"""Relative Tsallis entropy :math:`T^r_n` defined as:
-
-        .. math::
-            T^r_n = \frac{1}{n-1}  
-                \left[ 1- \int \frac{\rho^n(\mathbf{r})}{\rho^{n-1}_0(\mathbf{r})} d\mathbf{r} \right]
-
-        Parameters
-        ----------
-        n : int, optional
-            Order of the relative Renyi entropy, by default 2.
-        grids_weights : np.ndarray((N,), dtype=float), optional
-            Grids weights on N points, by default None.
-        ita_density : np.ndarray((N,), dtype=float), optional
-            ITA density, by default None.
-
-        Returns
-        -------
-        result : float
-            Scalar ITA result.
-        """           
-        if grids_weights is None:
-            grids_weights = self.grids.weights
-        if ita_density is None:
-            ita_density = self.itad.relative_rho_power(n)
-
-        result = (1/(n-1))*(1-(grids_weights * ita_density).sum())
-        return result    
-
-    def relative_onicescu_information(
-        self, 
-        n=2, 
-        grids_weights=None, 
-        ita_density=None
-    ):
-        r"""Relative Tsallis entropy :math:`E^r_n` defined as:
-
-        .. math::
-            E^r_n = \frac{1}{n-1} 
-                \int \frac{\rho^n(\mathbf{r})}{\rho^{n-1}_0(\mathbf{r})} d\mathbf{r} 
-
-        Parameters
-        ----------
-        n : int, optional
-            Order of the relative Renyi entropy, by default 2.
-        grids_weights : np.ndarray((N,), dtype=float), optional
-            Grids weights on N points, by default None.
-        ita_density : np.ndarray((N,), dtype=float), optional
-            ITA density, by default None.
-
-        Returns
-        -------
-        result : float
-            Scalar ITA result.
-        """           
-        if grids_weights is None:
-            grids_weights = self.grids.weights
-        if ita_density is None:
-            ita_density = self.itad.relative_rho_power(n)
-
-        result = (1/(n-1))*(grids_weights * ita_density).sum()
-        return result     
      
     def G1(
         self, 
@@ -624,7 +469,10 @@ class ITA:
         if ita_density is None:
             ita_density = self.itad.G1()
 
-        result = (grids_weights * ita_density).sum()
+        if len(ita_density.shape)==1:
+            result = np.einsum("g, g -> ", grids_weights, ita_density)
+        if len(ita_density.shape)==2:
+            result = np.einsum("g, h, gh -> ", grids_weights, grids_weights, ita_density)
         return result        
 
     def G2(
@@ -658,7 +506,10 @@ class ITA:
         if ita_density is None:
             ita_density = self.itad.G2()
 
-        result = (grids_weights * ita_density).sum()
+        if len(ita_density.shape)==1:
+            result = np.einsum("g, g -> ", grids_weights, ita_density)
+        if len(ita_density.shape)==2:
+            result = np.einsum("g, h, gh -> ", grids_weights, grids_weights, ita_density)
         return result    
 
     def G3(
@@ -693,5 +544,8 @@ class ITA:
         if ita_density is None:
             ita_density = self.itad.G3()
 
-        result = (grids_weights * ita_density).sum()
+        if len(ita_density.shape)==1:
+            result = np.einsum("g, g -> ", grids_weights, ita_density)
+        if len(ita_density.shape)==2:
+            result = np.einsum("g, h, gh -> ", grids_weights, grids_weights, ita_density)
         return result            
