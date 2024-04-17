@@ -94,7 +94,7 @@ def eval_rhos(mol, grids, rdm1, deriv=0, batch_mem=100):
 
     return rhos
 
-def eval_gammas(mol, grids, rdm2=None, deriv=0, batch_mem=1):
+def eval_gammas(mol, grids, rdm2=None, deriv=0, batch_mem=5):
     """ Method to generate the one electron density of the molecule at the desired points.
 
     Parameters
@@ -145,7 +145,6 @@ def eval_gammas(mol, grids, rdm2=None, deriv=0, batch_mem=1):
 
             batch_end = batch_start + aos.shape[1]
             batch_slice = slice(batch_start, batch_end)
-
             gamma[:,batch_slice,batch_slice] = eval_gamma(rdm2, ao)
             gamma_grad[:,batch_slice,batch_slice] = eval_gamma_grad(rdm2, ao, ao_grad) 
 

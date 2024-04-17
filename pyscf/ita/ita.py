@@ -101,6 +101,7 @@ class ITA:
             from pyscf.ita.itad import JointItaDensity
             dens = TwoElectronDensity.build(method, grids, deriv=rung-1)
             if rung==3:
+                #orbdens = None
                 orbdens = TwoElectronDensity.orbital_partition(method, grids, deriv=1)
                 keds = KineticEnergyDensity(dens,orbdens)
                 itad = JointItaDensity(dens, keds)
@@ -141,7 +142,7 @@ class ITA:
         self, 
         ita_code=[], 
         representation='electron density',
-        partition='hirshfeld',    
+        partition=None,    
         filename = 'pyita.log',
     ):
         r"""ITA batch calcuation.

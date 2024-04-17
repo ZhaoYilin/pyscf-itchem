@@ -394,7 +394,7 @@ class TwoElectronDensity(ElectronDensity):
             mo_coeff = mo_coeff[:,:,filter]
             mo_occ = mo_occ[:,filter]
             for i in range(len(mo_occ[0])):
-                orb_rdm2 = method.make_rdm1(mo_coeff[:,:,[i]], mo_occ[:,[i]])
+                orb_rdm2 = method.make_rdm2(mo_coeff[:,:,[i]], mo_occ[:,[i]])
                 orb_rdm2 = cls.spin_traced_rdm(orb_rdm2) 
                 orb_gammas = eval_gammas(mol, grids, orb_rdm2, deriv=deriv, batch_mem=batch_mem)   
                 ed = cls(orb_gammas)
@@ -406,10 +406,10 @@ class TwoElectronDensity(ElectronDensity):
             for i in range(len(mo_occ)):
                 orb_rdm2 = method.make_rdm2(mo_coeff[:,[i]], mo_occ[[i]])
                 orb_rdm2 = cls.spin_traced_rdm(orb_rdm2) 
-                orb_gammas = eval_gammas(mol, grids, orb_rdm2, deriv=deriv, batch_mem=batch_mem)   
+                orb_gammas = eval_gammas(mol, grids, orb_rdm2, deriv=deriv, batch_mem=batch_mem)  
                 ed = cls(orb_gammas)
                 partition_density.append(ed)
-     
+
         return PartitionDensity(partition_density)
 
 class PartitionDensity(list):    
