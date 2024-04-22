@@ -49,12 +49,10 @@ class ElectronDensity(np.ndarray):
         rho : np.ndarray((N,), dtype=float)
             Electron density on grid of N points.        
         """
+        rho = np.array(self[0])
         if mask:
-            rho = np.array(self[0])
             rho = np.ma.masked_less(rho, threshold)
             rho.filled(threshold)
-        else:
-            rho = np.array(self[0])
         return rho
 
     def gradient(self, mask=False, threshold=1.0e-30):
@@ -211,7 +209,7 @@ class OneElectronDensity(ElectronDensity):
         rdm1 = cls.spin_traced_rdm(rdm1)
 
         rhos = eval_rhos(mol, grids, rdm1, deriv=deriv, batch_mem=batch_mem)
-
+        
         obj = cls(rhos)
         return obj
 

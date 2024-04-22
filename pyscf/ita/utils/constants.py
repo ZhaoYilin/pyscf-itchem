@@ -1,11 +1,12 @@
-"""Physical constants in atomic units
+"""Physical constants in atomic units.
 """
-
 boltzmann = 3.1668154051341965e-06
 avogadro = 6.0221415e23
 planck = 6.2831853071795864769
 lightspeed = 137.035999206
 
+"""Dictionary of the multiplicities for each isoelectronic series (up to 100 electrons).
+"""
 MULTIPLICITIES = {
     "H": 2, "He":1, 
     "Li":2, "Be":1, "B": 2, "C": 3, "N": 4, "O": 3, "F": 2, "Ne":1, 
@@ -22,5 +23,29 @@ MULTIPLICITIES = {
     "Pa":4, "U" :5, "Np":6, "Pu":7, "Am":8, "Cm":9, "Bk":6, "Cf":5, 
     "Es":4, "Fm":3
 }
-r"""Dictionary of the multiplicities for each isoelectronic series (up to 100 electrons).
+
+"""Dictionary of the ita code/name pair.
 """
+ITA_DICT = {
+    1 : 'shannon_entropy',
+    2 : 'fisher_information',
+    3 : 'alternative_fisher_information',
+    4 : 'renyi_entropy',
+    5 : 'tsallis_entropy',
+    6 : 'onicescu_information',
+    7 : 'GBP_entropy',
+    8 : 'G1',
+    9 : 'G2',
+    10 : 'G3',
+}
+
+"""Dictionary of the kinetic energy code/name pair.
+"""
+KE_DICT = {
+    1 : 'general',
+    2 : 'thomas_fermi',
+    3 : 'dirac',
+    4 : 'weizsacker',
+    5 : 'gradient_expansion',
+    6 : 'single_particle'
+}

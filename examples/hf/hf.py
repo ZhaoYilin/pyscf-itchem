@@ -1,6 +1,6 @@
 from pyscf import gto,scf,dft
 from pyscf.ita.promolecule import ProMolecule
-from pyscf.ita.ita import ITA
+from pyscf.ita.kernel import ITA
 
 # constructe molecule
 mol = gto.Mole()

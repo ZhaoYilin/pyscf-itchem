@@ -1,5 +1,5 @@
 import numpy as np
-
+from functools import partial
 from pyscf.ita.promolecule import ProMolecule
 
 __all__ = ["Becke", "Hirshfeld"]
@@ -108,10 +108,9 @@ class Hirshfeld(AIM):
     def build(
         cls, 
         method, 
-        grids_coords, 
+        grids, 
         pro_charge=None, 
         pro_multiplicity=None, 
-        spin='ab', 
         deriv=0
         ):    
         """Class method to build the class.
@@ -126,9 +125,6 @@ class Hirshfeld(AIM):
             Dictionary of charge for each element, by default None.
         pro_multiplicity : Dict{str:int}, optional
             Dictionary of multiplicity for each element, by default None.            
-        spin: ('ab' | 'a' | 'b' | 'm')
-            Type of density to compute; either total, alpha-spin, beta-spin, or magnetization density,
-            by default 'ab'.            
         deriv : int
             List of molecule and promolecule derivative+1 level, by default 0.
 
@@ -138,7 +134,7 @@ class Hirshfeld(AIM):
             Instance of Hirshfeld class. 
         """       
         promol = ProMolecule.build(method, charge=pro_charge, multiplicity=pro_multiplicity)
-        promoldens = promol.electron_density(grids_coords, spin=spin, deriv=deriv)
+        promoldens = promol.one_electron_density(grids, deriv=deriv)
         obj = cls(promoldens)
         return obj
     
@@ -163,3 +159,49 @@ class Hirshfeld(AIM):
         
         omega = [free_atom_dens.density()/promoldens.density(mask=True) for free_atom_dens in promoldens]
         return omega
+
+    def partition(self, ita_name, **kwargs):
+        """_summary_
+
+        Parameters
+        ----------
+        ita_name : _type_
+            _description_
+        """        
+        def decorator(ita):
+            omega = self.sharing_function()
+            ita_func = getattr(ita, ita_name)
+            ita_func = partial(ita_func, **kwargs)
+            if ita_name in ['renyi_entropy','tsallis_entropy','onicescu_information']:
+                itad_func = getattr(ita.itad, "rho_power")
+            else:
+                itad_func = getattr(ita.itad, ita_name)
+                itad_func = partial(itad_func, **kwargs) 
+            def wrapper(**kwargs):
+                atomic_ita = []
+                if ita.representation == 'electron density':
+                    for omega_i in omega:
+                        itad_i = itad_func()*omega_i
+                        atomic_partition = ita_func(ita_density=itad_i, **kwargs)
+                        atomic_ita.append(atomic_partition) 
+                elif ita.representation == 'shape function':
+                    for omega_i in omega:
+                        nelec_i = (ita.grids.weights * ita.moldens.density() * omega_i).sum()
+                        itad_i = itad_func(omega=1./nelec_i)
+                        atomic_partition = ita_func(ita_density=itad_i, **kwargs)
+                        atomic_ita.append(atomic_partition) 
+                elif ita.representation=='atoms in molecules':
+                    for atom_id, omega_i in enumerate(omega):
+                        if ita_name in ['fisher_information','G3']:
+                            prorho_i = ita.prodens[atom_id].density(mask=True)
+                            prorho_grad_i = ita.prodens[atom_id].gradient()
+                            itad_i = itad_func(omega=omega_i, prorho=prorho_i, prorho_grad=prorho_grad_i)                          
+                        else:
+                            itad_i = itad_func(omega=omega_i)
+                        atomic_partition = ita_func(ita_density=itad_i, **kwargs)
+                        atomic_ita.append(atomic_partition) 
+                else:
+                    raise ValueError("Not valid representation.")                                       
+                return atomic_ita
+            return wrapper
+        return decorator

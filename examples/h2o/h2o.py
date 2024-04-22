@@ -1,6 +1,6 @@
 from pyscf import gto,dft
 from pyscf.ita.promolecule import ProMolecule
-from pyscf.ita.ita import ITA
+from pyscf.ita.kernel import ITA
 
 # constructe molecule
 mol = gto.Mole()
@@ -35,8 +35,11 @@ promol.build()
 
 # build ita
 ita = ITA(dft_mf, grids)
+ita.category = 'regular'
+ita.representation='electron density'
+ita.partition = 'hirshfeld'
 ita.promolecule = promol
 ita.build() 
 
 # batch compute
-ita.batch_compute(ita_code=[11,12,13,14,15,16,17], representation='electron density', partition = 'hirshfeld', filename='./ita_ed.log')
+ita.batch_compute(ita_code=[1,2,3,4,5,6,7],  filename='./ita_ed.log')

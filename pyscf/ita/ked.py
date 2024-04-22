@@ -278,3 +278,48 @@ class KineticEnergyDensity:
         term1 *= 0.125
         ked = term1 - 0.125*rho_lapl
         return ked
+
+class JointKineticEnergyDensity(KineticEnergyDensity):
+    r"""The Joint kinetic-energy density class.
+    """    
+    def __init__(
+        self, 
+        dens=None, 
+        orbdens=None
+    ):
+        r""" Initialize a instance.
+
+        Parameters
+        ----------
+        dens : TwoElectronDensity, optional
+            TwoElectronDensity instance for molecule, by default None.
+        orbdens : List[TwoElectronDensity], optional
+            List of TwoElectronDensity instance for orbitals, by default None.
+        """
+        self.dens = dens 
+        self.orbdens = orbdens 
+
+class ConditionalKineticEnergyDensity(KineticEnergyDensity):
+    r"""The conditional kinetic-energy density class.
+    """
+    def __init__(
+        self,
+        dens=None,
+        orbdens=None 
+    ):
+        r""" Initialize a instance.
+
+        Parameters
+        ----------
+        dens : TwoElectronDensity, optional
+            TwoElectronDensity instance for molecule, by default None.
+        orbdens : List[TwoElectronDensity], optional
+            List of TwoElectronDensity instance for orbitals, by default None.
+        """        
+        from pyscf.ita.dens import PartitionDensity
+
+        marginal_dens = np.sum(dens, axis=-1)
+        marginal_orbdens = PartitionDensity([np.sum(orbden, axis=-1) for orbden in orbdens])
+
+        self.dens = marginal_dens
+        self.orbdens = marginal_orbdens

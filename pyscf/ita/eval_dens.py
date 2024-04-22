@@ -29,14 +29,14 @@ def eval_rhos(mol, grids, rdm1, deriv=0, batch_mem=100):
         For deriv=2, 2D array of (5,N) array where last rows are nabla^2 rho.
     """    
     if deriv==0:
-        rho = np.zeros((grids.weights.size))
+        rho = np.zeros((1,grids.weights.size))
         batch_start, batch_end = 0, 0
         # aos, mask, weights, coords
         for aos, _, _, _ in ni.block_loop(mol, grids, mol.nao, deriv, batch_mem):   
             ao = aos  
             batch_end = batch_start + aos.shape[0]
             batch_slice = slice(batch_start, batch_end)
-            rho[batch_slice] = eval_rho(rdm1,ao)
+            rho[:,batch_slice] = eval_rho(rdm1,ao)
             batch_start = batch_end    
 
         rhos = rho 
@@ -120,17 +120,17 @@ def eval_gammas(mol, grids, rdm2=None, deriv=0, batch_mem=5):
         For deriv=2, 2D array of (5,N,N) array where last rows are nabla^2 rho.
     """  
     if deriv==0:
-        gamma = np.zeros((grids.weights.size,grids.weights.size))
+        gamma = np.zeros((1,grids.weights.size,grids.weights.size))
         batch_start, batch_end = 0, 0
         # aos, mask, weights, coords
         for aos, _, _, _ in ni.block_loop(mol, grids, mol.nao, deriv, batch_mem):  
             ao = aos      
             batch_end = batch_start + aos.shape[0]
             batch_slice = slice(batch_start, batch_end)
-            gamma[batch_slice,batch_slice] = eval_gamma(rdm2,ao) 
+            gamma[:,batch_slice,batch_slice] = eval_gamma(rdm2,ao) 
             batch_start = batch_end   
 
-        gammas = np.concatenate([gamma])
+        gammas = gamma
 
 
     elif deriv==1:

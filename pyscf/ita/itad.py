@@ -217,7 +217,7 @@ class JointItaDensity(ItaDensity):
             ElectronEensity instance for molecule, by default None.
         keds : KineticEnergyDensity, optional
             KineticEnergyDensity instance for molecule, by default None.
-        """        
+        """       
         self.dens = dens
         self.keds = keds
 
@@ -338,49 +338,35 @@ class JointItaDensity(ItaDensity):
         r"""Ghosh-Berkowitz-Parr (GBP) entropy density :math:`s_{GBP}` defined as:
 
         .. math::
-            s_{GBP} = \frac{3}{2}k\rho(\mathbf{r}) 
-                \left[ c+\ln \frac{t(\mathbf{r};\rho)}{t_{TF}(\mathbf{r};\rho)} \right]
+            s_{GBP} = \frac{3}{2}k\gamma(\mathbf{r}) 
+                \left[ c+\ln \frac{t(\mathbf{r};\gamma)}{t_{TF}(\mathbf{r};\gamma)} \right]
 
         Parameters
         ----------
-        rho : np.ndarray((N,), dtype=float), optional
-            Electron density on grid of N points, by default None.
-        ts : np.ndarray((N,), dtype=float), optional
+        gamma : np.ndarray((N,N), dtype=float), optional
+            Two electron density on grid of N points, by default None.
+        ts : np.ndarray((N,N), dtype=float), optional
             Single particle kenetic Electron density on grid of N points, by default None.
-        tTF : np.ndarray((N,), dtype=float), optional
+        tTF : np.ndarray((N,N), dtype=float), optional
             Thomas-Fermi kinetic energy density on grid of N points, by default None.
         k : float, optional
             Boltzmann constant, by default 1.0 for convenience.
-        omega : np.ndarray((N,), dtype=float), optional
+        omega : np.ndarray((N,N), dtype=float), optional
             Sharing function of single atom, by default None.
 
         Returns
         -------
-        ita_density : np.ndarray((N,), dtype=float)
+        ita_density : np.ndarray((N,N), dtype=float)
             Information theory density on grid of N points.
         """
-        if gamma is None: 
-            gamma = self.dens.density()
-        if ts is None:
-            ts = self.keds.single_particle()            
-        if tTF is None:
-            tTF = self.keds.thomas_fermi()
-        if omega is not None:
-            gamma = gamma*omega
-            ts = self.keds.single_particle(omega=omega)            
-            tTF = self.keds.thomas_fermi(omega=omega) 
-
-        cK = 0.3 * (3.0 * np.pi**2.0)**(2.0 / 3.0)
-        c = (5/3) + np.log(4*np.pi*cK/3)
-
-        ita_density = 1.5*k*gamma*(c+np.ma.log(ts/tTF))   
-        return ita_density 
+        ita_density = super(JointItaDensity, self).GBP_entropy(gamma,ts,tTF,k,omega)
+        return ita_density                  
     
 class ConditionalItaDensity(ItaDensity):
-    r"""Information-Theoretic Approch (ITA) Density class.
+    r"""Conditional Information-Theoretic Approch (ITA) Density class.
     """
     def __init__(
-        self, 
+        self,
         dens=None,
         keds=None 
     ):
@@ -388,126 +374,21 @@ class ConditionalItaDensity(ItaDensity):
 
         Parameters
         ----------
-        dens : ElectronDensity, optional
-            ElectronEensity instance for molecule, by default None.
+        dens : TwoElectronDensity, optional
+            TwoElectronEensity instance for molecule, by default None.
         keds : KineticEnergyDensity, optional
             KineticEnergyDensity instance for molecule, by default None.
         """        
-        self.dens = dens
+        from pyscf.ita.dens import PartitionDensity
+
+        marginal_dens = np.sum(dens, axis=-1)
+        marginal_orbdens = PartitionDensity([np.sum(orbden, axis=-1) for orbden in keds.orbdens])
+        keds.dens = marginal_dens
+        keds.orbdens = marginal_orbdens
+
+        self.dens = marginal_dens
         self.keds = keds
 
-    def rho_power(
-        self, 
-        n=2, 
-        gamma=None, 
-        omega=None
-    ):
-        r"""Electron density of power n defined as :math:`\gamma(\mathbf{r})^n`.
-
-        Parameters
-        ----------
-        n : int, optional
-            Order of rho power, by default 2.
-        gamma : np.ndarray((N,N), dtype=float), optional
-            Electron density on grid of N points, by default None.
-        omega : np.ndarray((N,N), dtype=float), optional
-            Sharing function of single atom, by default None.
-
-        Returns
-        -------
-        ita_density : np.ndarray((N,N), dtype=float)
-            Information theory density on grid of N points.
-        """
-        marginal_gamma = np.sum(gamma, axis=0)
-        ita_density = super(ConditionalItaDensity, self).rho_power(n,marginal_gamma,omega)
-        return ita_density
-    
-    def shannon_entropy(
-        self, 
-        gamma=None, 
-        omega=None
-    ):
-        r"""Shannon entropy density defined as:
-
-        .. math::
-            s_S = -\gamma(\mathbf{r}) \ln \gamma(\mathbf{r})       
-
-        Parameters
-        ----------
-        gamma : np.ndarray((N,N), dtype=float), optional
-            Electron density on grid of N points, by default None.
-        omega : np.ndarray((N,N), dtype=float), optional
-            Sharing function of single atom, by default None.
-            
-        Returns
-        -------
-        ita_density : np.ndarray((N,N), dtype=float)
-            Information theory density on grid of N points.
-        """
-        marginal_gamma = np.sum(gamma, axis=0)
-        ita_density = super(ConditionalItaDensity, self).shannon_entropy(marginal_gamma,omega)
-        return ita_density
-    
-    def fisher_information(
-        self, 
-        gamma=None, 
-        gamma_grad_norm=None, 
-        omega=None
-    ):
-        r"""Fisher information density defined as:
-
-        .. math::
-            i_F = \frac{|\nabla \gamma(\mathbf{r})|^2}{\gamma(\mathbf{r})} 
-
-        Parameters
-        ----------
-        gamma : np.ndarray((N,N), dtype=float), optional
-            Electron density on grid of N points, by default None.
-        gamma_grad_norm : np.ndarray((N,N), dtype=float), optional
-            Electron density graident norm on grid of N points, by default None.
-        omega : np.ndarray((N,N), dtype=float), optional
-            Sharing function of single atom, by default None.
-
-        Returns
-        -------
-        ita_density : np.ndarray((N,N), dtype=float)
-            Information theory density on grid of N points.
-        """      
-        marginal_gamma = np.sum(gamma, axis=0)
-        marginal_gamma_grad_norm = np.sum(gamma_grad_norm, axis=0)
-        ita_density = super(ConditionalItaDensity, self).fisher_information(marginal_gamma,marginal_gamma_grad_norm,omega)
-        return ita_density
-
-    def alternative_fisher_information(
-        self, 
-        gamma=None, 
-        gamma_lapl=None, 
-        omega=None
-    ):
-        r"""Alternative Fisher information density defined as:
-
-        .. math::
-            I^{\prime}_F = \nabla^2 \gamma(\mathbf{r}) \ln \gamma(\mathbf{r})
-
-        Parameters
-        ----------
-        gamma : np.ndarray((N,N), dtype=float), optional
-            Electron density on grid of N points, by default None.
-        gamma_lapl : np.ndarray((N,N), dtype=float), optional
-            Electron density laplacian on grid of N points, by default None.
-        omega : np.ndarray((N,N), dtype=float), optional
-            Sharing function of single atom, by default None.
-
-        Returns
-        -------
-        ita_density : np.ndarray((N,N), dtype=float)
-            Information theory density on grid of N points.
-        """  
-        marginal_gamma = np.sum(gamma, axis=0)
-        marginal_gamma_lapl = np.sum(gamma_lapl, axis=0)
-        ita_density = super(ConditionalItaDensity, self).alternative_fisher_information(marginal_gamma,marginal_gamma_lapl,omega)
-        return ita_density  
-    
 class RelativeItaDensity(ItaDensity):
     r"""Relative Information-Theoretic Approch (ITA) Density class.
     """
@@ -537,7 +418,7 @@ class RelativeItaDensity(ItaDensity):
         r"""Relative Shannon entropy density defined as:
 
         .. math::
-            s^r_S = -\rho(\mathbf{r})\ln \frac{\rho(\mathbf{r})}{\rho_0(\mathbf{r})}
+            s^r_S = \rho(\mathbf{r})\ln \frac{\rho(\mathbf{r})}{\rho_0(\mathbf{r})}
 
         Parameters
         ----------
@@ -561,7 +442,7 @@ class RelativeItaDensity(ItaDensity):
             rho = rho*omega
             prorho = prorho*omega
 
-        ita_density = -rho*np.ma.log(rho/prorho)  
+        ita_density = rho*np.ma.log(rho/prorho)  
         return ita_density
 
     def fisher_information(
@@ -611,7 +492,6 @@ class RelativeItaDensity(ItaDensity):
         if omega is not None:
             rho = rho*omega
             rho_grad = rho_grad*omega
-
         ita_density = rho*np.linalg.norm(rho_grad/rho[np.newaxis,:] - prorho_grad/prorho[np.newaxis,:],axis=0)**2  
         return ita_density   
 
@@ -1001,4 +881,4 @@ class MutualItaDensity(ItaDensity):
             gamma_lapl = gamma_lapl*omega
 
         ita_density = gamma_lapl*np.ma.log(gamma/np.outer(rho,rho))
-        return ita_density  
+        return ita_density 
