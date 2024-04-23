@@ -382,7 +382,8 @@ class ConditionalItaDensity(ItaDensity):
         from pyscf.ita.dens import PartitionDensity
 
         marginal_dens = np.sum(dens, axis=-1)
-        marginal_orbdens = PartitionDensity([np.sum(orbden, axis=-1) for orbden in keds.orbdens])
+        if keds is not None and keds.orbdens is not None:
+            marginal_orbdens = PartitionDensity([np.sum(orbden, axis=-1) for orbden in keds.orbdens])
         keds.dens = marginal_dens
         keds.orbdens = marginal_orbdens
 
@@ -568,12 +569,14 @@ class RelativeItaDensity(ItaDensity):
         if rho is None:           
             rho = self.dens.density() 
         if prorho is None:
-            prorho = self.prodens.density(mask=True)
+            prorho = self.prodens.density()
         if omega is not None:
             rho = rho*omega
             prorho = prorho*omega
 
-        ita_density = rho**n/prorho**(n-1)
+        prorho_power = np.ma.masked_less(prorho**(n-1), 1.0e-30)
+        prorho_power.filled(1.0e-30)
+        ita_density = rho**n/prorho_power
         return ita_density
     
     def G1(
@@ -750,7 +753,9 @@ class MutualItaDensity(ItaDensity):
             rho = rho*omega
             gamma = gamma*omega
 
-        ita_density = gamma**n/np.outer(rho,rho)**(n-1)
+        rho_outer = np.ma.masked_less(np.outer(rho,rho)**(n-1), 1.0e-30)
+        rho_outer.filled(1.0e-30)
+        ita_density = gamma**n/rho_outer
         return ita_density
     
     def shannon_entropy(
@@ -784,7 +789,9 @@ class MutualItaDensity(ItaDensity):
             rho = rho*omega
             gamma = gamma*omega
 
-        ita_density = -gamma*np.ma.log(gamma/np.outer(rho,rho))
+        rho_outer = np.ma.masked_less(np.outer(rho,rho), 1.0e-30)
+        rho_outer.filled(1.0e-30)
+        ita_density = -gamma*np.ma.log(gamma/rho_outer)
         return ita_density
 
 
@@ -838,7 +845,13 @@ class MutualItaDensity(ItaDensity):
 
         rho_grad = np.array([np.outer(rho_i,rho_i) for rho_i in rho_grad])
         rho = np.outer(rho,rho)
-        ita_density = gamma*np.linalg.norm(gamma_grad/gamma[np.newaxis,:] - rho_grad/rho[np.newaxis,:],axis=0)**2  
+
+
+        gamma_newaxis = np.ma.masked_less(gamma[np.newaxis,:], 1.0e-30)
+        gamma_newaxis.filled(1.0e-30)
+        rho_newaxis = np.ma.masked_less(rho[np.newaxis,:], 1.0e-30)
+        rho_newaxis.filled(1.0e-30)
+        ita_density = gamma*np.linalg.norm(gamma_grad/gamma_newaxis-rho_grad/rho_newaxis, axis=0)**2  
         return ita_density   
 
     def alternative_fisher_information(
@@ -880,5 +893,7 @@ class MutualItaDensity(ItaDensity):
         if omega is not None:
             gamma_lapl = gamma_lapl*omega
 
+        rho_outer = np.ma.masked_less(np.outer(rho,rho), 1.0e-30)
+        rho_outer.filled(1.0e-30)
         ita_density = gamma_lapl*np.ma.log(gamma/np.outer(rho,rho))
         return ita_density 
