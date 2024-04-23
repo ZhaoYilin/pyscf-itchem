@@ -382,13 +382,14 @@ class ConditionalItaDensity(ItaDensity):
         from pyscf.ita.dens import PartitionDensity
 
         marginal_dens = np.sum(dens, axis=-1)
-        if keds is not None and keds.orbdens is not None:
-            marginal_orbdens = PartitionDensity([np.sum(orbden, axis=-1) for orbden in keds.orbdens])
-        keds.dens = marginal_dens
-        keds.orbdens = marginal_orbdens
-
         self.dens = marginal_dens
-        self.keds = keds
+
+        if keds is not None: 
+            keds.dens = marginal_dens
+            if keds.orbdens is not None:
+                marginal_orbdens = PartitionDensity([np.sum(orbden, axis=-1) for orbden in keds.orbdens])
+                keds.orbdens = marginal_orbdens
+            self.keds = keds
 
 class RelativeItaDensity(ItaDensity):
     r"""Relative Information-Theoretic Approch (ITA) Density class.
