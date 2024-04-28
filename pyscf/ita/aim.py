@@ -60,25 +60,9 @@ class Becke(AIM):
         -------
         omega : List[np.ndarray((N,), dtype=float)]
             Sharing functions for a list of atoms.            
-        """        
-        if mol==None:
-            mol = self.mol
-        if grids==None:
-            grids = self.grids
-
-        n_nuc = len(mol.elements)
-        omega = []
-        _, grids_weights = grids.get_partition(mol)
-        grids_weights = np.ma.masked_less(grids_weights, 1e-30)
-        grids_weights.filled(1e-30)
-        for i, grids_weights_i in enumerate(np.split(grids_weights,n_nuc)):
-            omega_i = [np.zeros_like(grids_weights_i)]*n_nuc
-            omega_i[i] = grids_weights_i
-            omega_i = np.concatenate(omega_i,axis=0)  
-            omega_i = omega_i/grids_weights         
-            omega.append(omega_i)
-
-        return omega
+        """       
+        NotImplemented 
+ 
 
 class Hirshfeld(AIM):
     r"""Hirshfeld's stockholder approach.
