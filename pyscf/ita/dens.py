@@ -241,40 +241,22 @@ class OneElectronDensity(ElectronDensity):
         """
         from pyscf import mcscf
         if hasattr(method, "_scf"):
-            mf = method._scf       
+            make_rdm1 = method._scf.to_rhf().make_rdm1       
         else:
-            mf = method 
+            make_rdm1 = method.to_rhf().make_rdm1
+        # spin traced nature orbital mo_occ and mo_coeff 
         noons, natorbs = mcscf.addons.make_natural_orbitals(method)
-        method.mo_coeff = natorbs
-        method.mo_occ = noons
-
         mol = method.mol
-        mo_coeff = np.array(method.mo_coeff)
-        mo_occ = np.array(method.mo_occ)
         partition_density = []
 
-        # Make One-Particle Reduced Density Matrix, 1-RDM
-        if len(np.array(mo_coeff).shape)==3:
-            filter = list(mo_occ[0]>1e-8) or list(mo_occ[1]>1e-8)            
-            mo_coeff = mo_coeff[:,:,filter]
-            mo_occ = mo_occ[:,filter]
-            for i in range(len(mo_occ[0])):
-                orb_rdm1 = mf.make_rdm1(mo_coeff[:,:,[i]], mo_occ[:,[i]])
-                orb_rdm1 = cls.spin_traced_rdm(orb_rdm1) 
-                orb_rhos = eval_rhos(mol, grids, orb_rdm1, deriv=deriv, batch_mem=batch_mem)   
-                ed = cls(orb_rhos)
-                partition_density.append(ed)
-        else:
-            filter = mo_occ>1e-8           
-            print(filter)
-            mo_coeff = mo_coeff[:,filter]
-            mo_occ = mo_occ[filter]
-            for i in range(len(mo_occ)):
-                orb_rdm1 = mf.make_rdm1(mo_coeff[:,[i]], mo_occ[[i]])
-                orb_rdm1 = cls.spin_traced_rdm(orb_rdm1) 
-                orb_rhos = eval_rhos(mol, grids, orb_rdm1, deriv=deriv, batch_mem=batch_mem)   
-                ed = cls(orb_rhos)
-                partition_density.append(ed)
+        filter = noons>1e-8           
+        natorbs = natorbs[:,filter]
+        noons = noons[filter]
+        for i in range(len(noons)):
+            orb_rdm1 = make_rdm1(natorbs[:,[i]], noons[[i]])
+            orb_rhos = eval_rhos(mol, grids, orb_rdm1, deriv=deriv, batch_mem=batch_mem)   
+            ed = cls(orb_rhos)
+            partition_density.append(ed)
 
         return PartitionDensity(partition_density)
 
@@ -381,39 +363,22 @@ class TwoElectronDensity(ElectronDensity):
         """
         from pyscf import mcscf
         if hasattr(method, "_scf"):
-            mf = method._scf       
+            make_rdm2 = method._scf.to_rhf().make_rdm2       
         else:
-            mf = method 
+            make_rdm2 = method.to_rhf().make_rdm2  
+        # spin traced nature orbital mo_occ and mo_coeff 
         noons, natorbs = mcscf.addons.make_natural_orbitals(method)
-        method.mo_coeff = natorbs
-        method.mo_occ = noons
-
         mol = method.mol
-        mo_coeff = np.array(method.mo_coeff)
-        mo_occ = np.array(method.mo_occ)
         partition_density = []
 
-        # Make One-Particle Reduced Density Matrix, 1-RDM
-        if len(np.array(mo_coeff).shape)==3:
-            filter = list(mo_occ[0]>1e-8) or list(mo_occ[1]>1e-8)            
-            mo_coeff = mo_coeff[:,:,filter]
-            mo_occ = mo_occ[:,filter]
-            for i in range(len(mo_occ[0])):
-                orb_rdm2 = mf.make_rdm2(mo_coeff[:,:,[i]], mo_occ[:,[i]])
-                orb_rdm2 = cls.spin_traced_rdm(orb_rdm2) 
-                orb_gammas = eval_gammas(mol, grids, orb_rdm2, deriv=deriv, batch_mem=batch_mem)   
-                ed = cls(orb_gammas)
-                partition_density.append(ed)
-        else:
-            filter = mo_occ>1e-8           
-            mo_coeff = mo_coeff[:,filter]
-            mo_occ = mo_occ[filter]
-            for i in range(len(mo_occ)):
-                orb_rdm2 = mf.make_rdm2(mo_coeff[:,[i]], mo_occ[[i]])
-                orb_rdm2 = cls.spin_traced_rdm(orb_rdm2) 
-                orb_gammas = eval_gammas(mol, grids, orb_rdm2, deriv=deriv, batch_mem=batch_mem)  
-                ed = cls(orb_gammas)
-                partition_density.append(ed)
+        filter = noons>1e-8           
+        natorbs = natorbs[:,filter]
+        noons = noons[filter]
+        for i in range(len(noons)):
+            orb_rdm2 = make_rdm2(natorbs[:,[i]], noons[[i]])
+            orb_gammas = eval_gammas(mol, grids, orb_rdm2, deriv=deriv, batch_mem=batch_mem)   
+            ed = cls(orb_gammas)
+            partition_density.append(ed)
 
         return PartitionDensity(partition_density)
 
