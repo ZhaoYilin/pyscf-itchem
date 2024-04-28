@@ -239,11 +239,14 @@ class OneElectronDensity(ElectronDensity):
         obj : PartitionDensity
             Instance of PartitionDensity class.
         """
-        if 'mcscf' in str(method.__class__):
-            from pyscf import mcscf
-            noons, natorbs = mcscf.addons.make_natural_orbitals(method)
-            method.mo_coeff = natorbs
-            method.mo_occ = noons
+        from pyscf import mcscf
+        if hasattr(method, "_scf"):
+            mf = method._scf       
+        else:
+            mf = method 
+        noons, natorbs = mcscf.addons.make_natural_orbitals(method)
+        method.mo_coeff = natorbs
+        method.mo_occ = noons
 
         mol = method.mol
         mo_coeff = np.array(method.mo_coeff)
@@ -256,17 +259,17 @@ class OneElectronDensity(ElectronDensity):
             mo_coeff = mo_coeff[:,:,filter]
             mo_occ = mo_occ[:,filter]
             for i in range(len(mo_occ[0])):
-                orb_rdm1 = method.make_rdm1(mo_coeff[:,:,[i]], mo_occ[:,[i]])
+                orb_rdm1 = mf.make_rdm1(mo_coeff[:,:,[i]], mo_occ[:,[i]])
                 orb_rdm1 = cls.spin_traced_rdm(orb_rdm1) 
                 orb_rhos = eval_rhos(mol, grids, orb_rdm1, deriv=deriv, batch_mem=batch_mem)   
                 ed = cls(orb_rhos)
                 partition_density.append(ed)
         else:
-            filter = mo_occ>0           
+            filter = mo_occ           
             mo_coeff = mo_coeff[:,filter]
             mo_occ = mo_occ[filter]
             for i in range(len(mo_occ)):
-                orb_rdm1 = method.make_rdm1(mo_coeff[:,[i]], mo_occ[[i]])
+                orb_rdm1 = mf.make_rdm1(mo_coeff[:,[i]], mo_occ[[i]])
                 orb_rdm1 = cls.spin_traced_rdm(orb_rdm1) 
                 orb_rhos = eval_rhos(mol, grids, orb_rdm1, deriv=deriv, batch_mem=batch_mem)   
                 ed = cls(orb_rhos)
@@ -375,11 +378,13 @@ class TwoElectronDensity(ElectronDensity):
         obj : PartitionDensity
             Instance of PartitionDensity class.
         """
-        if 'mcscf' in str(method.__class__):
-            from pyscf import mcscf
-            noons, natorbs = mcscf.addons.make_natural_orbitals(method)
-            method.mo_coeff = natorbs
-            method.mo_occ = noons
+        if hasattr(method, "_scf"):
+            mf = method._scf       
+        else:
+            mf = method 
+        noons, natorbs = mcscf.addons.make_natural_orbitals(method)
+        method.mo_coeff = natorbs
+        method.mo_occ = noons
 
         mol = method.mol
         mo_coeff = np.array(method.mo_coeff)
@@ -392,7 +397,7 @@ class TwoElectronDensity(ElectronDensity):
             mo_coeff = mo_coeff[:,:,filter]
             mo_occ = mo_occ[:,filter]
             for i in range(len(mo_occ[0])):
-                orb_rdm2 = method.make_rdm2(mo_coeff[:,:,[i]], mo_occ[:,[i]])
+                orb_rdm2 = mf.make_rdm2(mo_coeff[:,:,[i]], mo_occ[:,[i]])
                 orb_rdm2 = cls.spin_traced_rdm(orb_rdm2) 
                 orb_gammas = eval_gammas(mol, grids, orb_rdm2, deriv=deriv, batch_mem=batch_mem)   
                 ed = cls(orb_gammas)
@@ -402,7 +407,7 @@ class TwoElectronDensity(ElectronDensity):
             mo_coeff = mo_coeff[:,filter]
             mo_occ = mo_occ[filter]
             for i in range(len(mo_occ)):
-                orb_rdm2 = method.make_rdm2(mo_coeff[:,[i]], mo_occ[[i]])
+                orb_rdm2 = mf.make_rdm2(mo_coeff[:,[i]], mo_occ[[i]])
                 orb_rdm2 = cls.spin_traced_rdm(orb_rdm2) 
                 orb_gammas = eval_gammas(mol, grids, orb_rdm2, deriv=deriv, batch_mem=batch_mem)  
                 ed = cls(orb_gammas)

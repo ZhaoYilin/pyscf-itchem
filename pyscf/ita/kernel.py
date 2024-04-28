@@ -124,45 +124,68 @@ class ITA(ExpectedValue):
         # Build molecule electron density.
         if category=='regular':
             from pyscf.ita.itad import ItaDensity
+            nelec = self.method.mol.nelectron
             dens = OneElectronDensity.build(method, grids, deriv=self.rung-1)
             if rung==3:
+                if representation=='shape function': 
+                    dens = dens/nelec
+                    orbdens = orbdens/nelec
                 orbdens = OneElectronDensity.orbital_partition(method, grids, deriv=1)
                 keds = KineticEnergyDensity(dens,orbdens)
                 itad = ItaDensity(dens, keds)
             else:
+                if representation=='shape function': 
+                    dens = dens/nelec
                 itad = ItaDensity(dens)
         elif category=='joint':
             from pyscf.ita.itad import JointItaDensity
+            nelec = self.method.mol.nelectron
             dens = TwoElectronDensity.build(method, grids, deriv=rung-1)
             if rung==3:
                 orbdens = TwoElectronDensity.orbital_partition(method, grids, deriv=1)
+                if representation=='shape function': 
+                    dens = dens/(nelec*(nelec-1))
+                    orbdens = orbdens/(nelec*(nelec-1))
                 keds = KineticEnergyDensity(dens,orbdens)
                 itad = JointItaDensity(dens, keds)
             else:
+                if representation=='shape function': 
+                    dens = dens/(nelec*(nelec-1))
                 itad = JointItaDensity(dens)
         elif category=='conditional':
             from pyscf.ita.itad import ConditionalItaDensity
+            nelec = self.method.mol.nelectron
             dens = TwoElectronDensity.build(method, grids, deriv=rung-1)
             if rung==3:
                 orbdens = TwoElectronDensity.orbital_partition(method, grids, deriv=1)
+                if representation=='shape function': 
+                    dens = dens/(nelec*(nelec-1))
+                    orbdens = orbdens/(nelec*(nelec-1))
                 keds = KineticEnergyDensity(dens,orbdens)
                 itad = ConditionalItaDensity(dens, keds)
             else:
+                if representation=='shape function': 
+                    dens = dens/(nelec*(nelec-1))
                 itad = ConditionalItaDensity(dens)
         elif category=='relative':
             from pyscf.ita.itad import RelativeItaDensity
+            nelec = self.method.mol.nelectron
             dens = OneElectronDensity.build(method, grids, deriv=rung-1)  
             prodens = promolecule.one_electron_density(self.grids, deriv=rung-1)
+            if representation=='shape function': 
+                dens = dens/nelec
+                prodens = prodens/nelec
             self.dens = dens
             self.prodens = prodens
             itad = RelativeItaDensity(dens,prodens)
         elif category=='mutual':
             from pyscf.ita.itad import MutualItaDensity
             nelec = self.method.mol.nelectron
-            onedens = OneElectronDensity.build(method, grids, deriv=rung-1) 
-            onedens = onedens/nelec
+            onedens = OneElectronDensity.build(method, grids, deriv=rung-1)
             twodens = TwoElectronDensity.build(method, grids, deriv=rung-1)
-            twodens = twodens/(nelec*(nelec-1))
+            if representation=='shape function': 
+                onedens = onedens/nelec
+                twodens = twodens/(nelec*(nelec-1))
             itad = MutualItaDensity(onedens,twodens)
         else:
             raise ValueError("Not a valid category.")
@@ -224,14 +247,11 @@ class ITA(ExpectedValue):
                 omega = self.aim.sharing_function()
                 result = []
                 for omega_i in omega:            
-                    nelec_i = (self.grids.weights * self.moldens.density() * omega_i).sum()
-                    itad_i = itad_func(omega=1./nelec_i)
+                    itad_i = itad_func(omega=omega_i)
                     atomic_partition = ita_func(ita_density=itad_i, **kwargs)
                     result.append(atomic_partition)
             else:
-                nelec = (self.grids.weights * self.moldens.density()).sum()
-                itad = itad_func(omega=1./nelec)
-                result = ita_func(ita_density=itad, **kwargs)                
+                result = ita_func()                
         if self.representation=='atoms in molecules':
             omega = self.aim.sharing_function()
             result = []
