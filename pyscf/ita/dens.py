@@ -255,7 +255,7 @@ class OneElectronDensity(ElectronDensity):
 
         # Make One-Particle Reduced Density Matrix, 1-RDM
         if len(np.array(mo_coeff).shape)==3:
-            filter = list(mo_occ[0]>0) or list(mo_occ[1]>0)            
+            filter = list(mo_occ[0]>1e-8) or list(mo_occ[1]>1e-8)            
             mo_coeff = mo_coeff[:,:,filter]
             mo_occ = mo_occ[:,filter]
             for i in range(len(mo_occ[0])):
@@ -265,7 +265,8 @@ class OneElectronDensity(ElectronDensity):
                 ed = cls(orb_rhos)
                 partition_density.append(ed)
         else:
-            filter = mo_occ           
+            filter = mo_occ>1e-8           
+            print(filter)
             mo_coeff = mo_coeff[:,filter]
             mo_occ = mo_occ[filter]
             for i in range(len(mo_occ)):
@@ -378,6 +379,7 @@ class TwoElectronDensity(ElectronDensity):
         obj : PartitionDensity
             Instance of PartitionDensity class.
         """
+        from pyscf import mcscf
         if hasattr(method, "_scf"):
             mf = method._scf       
         else:
@@ -393,7 +395,7 @@ class TwoElectronDensity(ElectronDensity):
 
         # Make One-Particle Reduced Density Matrix, 1-RDM
         if len(np.array(mo_coeff).shape)==3:
-            filter = list(mo_occ[0]>0) or list(mo_occ[1]>0)            
+            filter = list(mo_occ[0]>1e-8) or list(mo_occ[1]>1e-8)            
             mo_coeff = mo_coeff[:,:,filter]
             mo_occ = mo_occ[:,filter]
             for i in range(len(mo_occ[0])):
@@ -403,7 +405,7 @@ class TwoElectronDensity(ElectronDensity):
                 ed = cls(orb_gammas)
                 partition_density.append(ed)
         else:
-            filter = mo_occ>0           
+            filter = mo_occ>1e-8           
             mo_coeff = mo_coeff[:,filter]
             mo_occ = mo_occ[filter]
             for i in range(len(mo_occ)):
