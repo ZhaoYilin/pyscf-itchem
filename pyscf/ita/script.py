@@ -24,7 +24,7 @@ def batch_compute(
     log = Log('PYSCF-ITA', head_banner, foot_banner, timer)
     log.target = open(filename,'w')
 
-    # Grid information section
+    # ITA setting information section
     log.hline(char='=')
     log.blank()
     log('SETTING INFORMATION'.format())   

@@ -2,7 +2,7 @@ import numpy as np
 from functools import partial
 from pyscf.ita.promolecule import ProMolecule
 
-__all__ = ["Becke", "Hirshfeld"]
+__all__ = ["Hirshfeld"]
 
 
 class AIM:

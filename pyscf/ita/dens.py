@@ -290,7 +290,6 @@ class TwoElectronDensity(ElectronDensity):
         rdm = np.array(rdm)
 
         if len(rdm.shape)==5:
-            # spin rdm2
             rdm = rdm[0] + rdm[1] + rdm[1].transpose(2,3,0,1) + rdm[2]
         
         return rdm
@@ -361,6 +360,7 @@ class TwoElectronDensity(ElectronDensity):
         obj : PartitionDensity
             Instance of PartitionDensity class.
         """
+        # This function is not verified.
         from pyscf import mcscf
         if hasattr(method, "_scf"):
             make_rdm2 = method._scf.to_rhf().make_rdm2       

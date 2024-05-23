@@ -30,7 +30,7 @@ class ITA(ExpectedValue):
     >>> ita = ITA()
     >>> ita.method = mf
     >>> ita.grids = grids
-    >>> ita.category = 'regular'    
+    >>> ita.category = 'individual'    
     >>> ita.build()        
     """
     def __init__(
@@ -38,7 +38,7 @@ class ITA(ExpectedValue):
         method=None, 
         grids=None,
         rung=3, 
-        category='regular',
+        category='individual',
         representation='electron density',
         partition=None,
         promolecule=None
@@ -53,8 +53,8 @@ class ITA(ExpectedValue):
             Pyscf Grids instance.
         rung : int, optional
             Density derivate+1 level, by default 3.
-        category : ('regular' | 'joint' | 'conditional' | 'relative' | 'mutual'), optional
-            Type of ITA, by default 'regular'.   
+        category : ('individual' | 'joint' | 'conditional' | 'relative' | 'mutual'), optional
+            Type of ITA, by default 'individual'.   
         representation : ('electron density' | 'shape function' | 'atoms in molecules')
             Type of representation, by default 'electron density'.            
         partition : (None | 'hirshfeld' | 'bader' | 'becke'), optional
@@ -92,8 +92,8 @@ class ITA(ExpectedValue):
             Pyscf Grids instance, by deafult None.
         rung : int
             Density derivate+1 level, by default 3,.           
-        category : ('regular' | 'joint' | 'conditional' | 'relative' | 'mutual'), optional
-            Type of ITA, by default 'regular'.   
+        category : ('individual' | 'joint' | 'conditional' | 'relative' | 'mutual'), optional
+            Type of ITA, by default 'individual'.   
         representation : ('electron density' | 'shape function' | 'atoms in molecules')
             Type of representation, by default 'electron density'.            
         partition : (None | 'hirshfeld' | 'bader' | 'becke'), optional
@@ -122,7 +122,7 @@ class ITA(ExpectedValue):
             self.promolecule = promolecule
 
         # Build molecule electron density.
-        if category=='regular':
+        if category=='individual':
             from pyscf.ita.itad import ItaDensity
             nelec = self.method.mol.nelectron
             dens = OneElectronDensity.build(method, grids, deriv=self.rung-1)
@@ -380,10 +380,15 @@ class ITA(ExpectedValue):
         if ita_density is None:
             ita_density = self.itad.fisher_information()
 
-        if len(ita_density.shape)==1:
-            result = np.einsum("g, g -> ", grids_weights, ita_density)
-        if len(ita_density.shape)==2:
-            result = np.einsum("g, h, gh -> ", grids_weights, grids_weights, ita_density)
+        if self.category=='conditional':
+            term1 = np.einsum("g, h, gh -> ", grids_weights, grids_weights, ita_density[0])
+            term2 = np.einsum("g, g -> ", grids_weights, ita_density[1])
+            result = term1-term2
+        else:
+            if len(ita_density.shape)==1:
+                result = np.einsum("g, g -> ", grids_weights, ita_density)
+            if len(ita_density.shape)==2:
+                result = np.einsum("g, h, gh -> ", grids_weights, grids_weights, ita_density)
         return result
 
     def alternative_fisher_information(
@@ -487,7 +492,10 @@ class ITA(ExpectedValue):
             result = np.einsum("g, g -> ", grids_weights, ita_density)
         if len(ita_density.shape)==2:
             result = np.einsum("g, h, gh -> ", grids_weights, grids_weights, ita_density)
-        result = (1/(1-n))*np.log10(result)
+        if self.category in ('relative','mutual') :
+            result = (1/(n-1))*np.ma.log10(result)
+        else:
+            result = (1/(1-n))*np.ma.log10(result)
         return result
     
     def tsallis_entropy(
@@ -524,7 +532,11 @@ class ITA(ExpectedValue):
             result = np.einsum("g, g -> ", grids_weights, ita_density)
         if len(ita_density.shape)==2:
             result = np.einsum("g, h, gh -> ", grids_weights, grids_weights, ita_density)
-        result = (1/(n-1))*(1-result)
+
+        if self.category in ('relative','mutual') :
+            result = (1/(1-n))*(1-result)
+        else:
+            result = (1/(n-1))*(1-result)
         return result 
     
     def onicescu_information(
@@ -561,7 +573,11 @@ class ITA(ExpectedValue):
             result = np.einsum("g, g -> ", grids_weights, ita_density)
         if len(ita_density.shape)==2:
             result = np.einsum("g, h, gh -> ", grids_weights, grids_weights, ita_density)
-        result = (1/(n-1))*result
+
+        if self.category in ('relative','mutual') :
+            result = (1/(1-n))*(1-result)
+        else:
+            result = (1/(n-1))*(1-result)            
         return result
      
     def G1(
@@ -686,14 +702,14 @@ class KineticEnergy(ExpectedValue):
     >>> grids = dft.Grids(mol)
     >>> grids.build()    
     >>> ke = KineticEnergy(mf,grids)
-    >>> ke.category = 'regular'    
+    >>> ke.category = 'individual'    
     >>> ke.build()        
     """
     def __init__(
         self, 
         method=None, 
         grids=None,
-        category='regular',
+        category='individual',
         representation='electron density',
         partition=None,
         promolecule=None
@@ -706,8 +722,8 @@ class KineticEnergy(ExpectedValue):
             Pyscf scf method or post-scf method instance.
         grids : Grids
             Pyscf Grids instance.
-        category : ('regular' | 'joint' | 'conditional' | 'relative' | 'mutual'), optional
-            Type of ITA, by default 'regular'.   
+        category : ('individual' | 'joint' | 'conditional' | 'relative' | 'mutual'), optional
+            Type of ITA, by default 'individual'.   
         representation : ('electron density' | 'shape function' | 'atoms in molecules')
             Type of representation, by default 'electron density'.            
         partition : (None | 'hirshfeld' | 'bader' | 'becke'), optional
@@ -741,8 +757,8 @@ class KineticEnergy(ExpectedValue):
             Pyscf scf method or post-scf method instance, by deafult None.
         grids : Grids, optional
             Pyscf Grids instance, by deafult None.
-        category : ('regular' | 'joint' | 'conditional' | 'relative' | 'mutual'), optional
-            Type of ITA, by default 'regular'.   
+        category : ('individual' | 'joint' | 'conditional' | 'relative' | 'mutual'), optional
+            Type of ITA, by default 'individual'.   
         representation : ('electron density' | 'shape function' | 'atoms in molecules')
             Type of representation, by default 'electron density'.            
         partition : (None | 'hirshfeld' | 'bader' | 'becke'), optional
@@ -769,7 +785,7 @@ class KineticEnergy(ExpectedValue):
             self.promolecule = promolecule
 
         # Build molecule electron density.
-        if category=='regular':
+        if category=='individual':
             dens = OneElectronDensity.build(method, grids, deriv=2)
             orbdens = OneElectronDensity.orbital_partition(method, grids, deriv=1)
             keds = KineticEnergyDensity(dens,orbdens)
@@ -1124,7 +1140,7 @@ class EnergyDecompositionAnalysis(ExpectedValue):
     >>> grids = dft.Grids(mol)
     >>> grids.build()    
     >>> ke = KineticEnergy(mf,grids)
-    >>> ke.category = 'regular'    
+    >>> ke.category = 'individual'    
     >>> ke.build()        
     """
     def __init__(
@@ -1362,7 +1378,7 @@ class OrbitalEntanglement(ExpectedValue):
         s1 = np.zeros((no))
         for i in range(no):
             eigenvalues, _ = np.linalg.eig(odm1[i,:,:])
-            s1[i] = -sum([sigma * np.log(sigma) for sigma in eigenvalues])
+            s1[i] = -sum([sigma * np.ma.log(sigma) for sigma in eigenvalues])
         return s1
 
     def two_orbital_entropy(self, odm2=None):
@@ -1383,7 +1399,7 @@ class OrbitalEntanglement(ExpectedValue):
         for i in range(no):
             for j in range(no):
                 eigenvalues, _ = np.linalg.eig(odm2[i,j,:,:])
-                s2[i,j] = -sum([sigma * np.log(sigma) for sigma in eigenvalues])
+                s2[i,j] = -sum([sigma * np.ma.log(sigma) for sigma in eigenvalues])
         return s2
     
     def mututal_information(self, s1=None, s2=None):

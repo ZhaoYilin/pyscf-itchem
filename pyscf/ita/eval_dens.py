@@ -1,7 +1,4 @@
 import numpy as np
-from pyscf import dft
-
-ni = dft.numint.NumInt()
 
 def eval_rhos(mol, grids, rdm1, deriv=0, batch_mem=100):
     """ Method to generate the one electron density of the molecule at the desired points.
@@ -28,16 +25,16 @@ def eval_rhos(mol, grids, rdm1, deriv=0, batch_mem=100):
         for x,y,z components; 
         For deriv=2, 2D array of (5,N) array where last rows are nabla^2 rho.
     """    
+    aos = dft.numint.eval_ao(mol, grids.coords, deriv)
+    batch_length = batch_mem*1024
+
     if deriv==0:
         rho = np.zeros((1,grids.weights.size))
-        batch_start, batch_end = 0, 0
-        # aos, mask, weights, coords
-        for aos, _, _, _ in ni.block_loop(mol, grids, mol.nao, deriv, batch_mem):   
-            ao = aos  
-            batch_end = batch_start + aos.shape[0]
-            batch_slice = slice(batch_start, batch_end)
+        for i in range(0, aos.shape[0], batch_length):
+            batch_slice = slice(i, i+batch_length)
+            ao = aos[batch_slice, :]
+
             rho[:,batch_slice] = eval_rho(rdm1,ao)
-            batch_start = batch_end    
 
         rhos = rho 
 
@@ -45,19 +42,16 @@ def eval_rhos(mol, grids, rdm1, deriv=0, batch_mem=100):
         rho = np.zeros((1,grids.weights.size))
         rho_grad = np.zeros((3,grids.weights.size))
 
-        batch_start, batch_end = 0, 0
-        # aos, mask, weights, coords
-        for aos, _, _, _ in ni.block_loop(mol, grids, mol.nao, deriv, batch_mem): 
-            ao = aos[0]
-            ao_grad = aos[1:4]
+        for i in range(0, aos.shape[1], batch_length):
+            print('hello')
+            batch_slice = slice(i, i+batch_length)
+            batch_aos = aos[:,batch_slice, :]
 
-            batch_end = batch_start + aos.shape[1]
-            batch_slice = slice(batch_start, batch_end)
+            ao = batch_aos[0]
+            ao_grad = batch_aos[1:4]
 
-            rho[:,batch_slice] = eval_rho(rdm1, ao)
+            rho[:,batch_slice] = eval_rho(rdm1,ao)
             rho_grad[:,batch_slice] = eval_rho_grad(rdm1, ao, ao_grad) 
-
-            batch_start = batch_end    
 
         rhos = np.concatenate([rho, rho_grad])  
 
@@ -66,25 +60,22 @@ def eval_rhos(mol, grids, rdm1, deriv=0, batch_mem=100):
         rho_grad = np.zeros((3,grids.weights.size))
         rho_hess = np.zeros((3,3,grids.weights.size))
 
-        batch_start, batch_end = 0, 0
-        # aos, mask, weights, coords
-        for aos, _, _, _ in ni.block_loop(mol, grids, mol.nao, deriv, batch_mem):  
-            ao = aos[0]
-            ao_grad = aos[1:4]
+        for i in range(0, aos.shape[1], batch_length):
+            batch_slice = slice(i, i+batch_length)
+            batch_aos = aos[:,batch_slice, :]
+
+            ao = batch_aos[0]
+            ao_grad = batch_aos[1:4]
             ao_hess = np.array([
-                [aos[4], aos[5], aos[6]],
-                [aos[5], aos[7], aos[8]],
-                [aos[6], aos[8], aos[9]],
+                [batch_aos[4], batch_aos[5], batch_aos[6]],
+                [batch_aos[5], batch_aos[7], batch_aos[8]],
+                [batch_aos[6], batch_aos[8], batch_aos[9]],
             ])
 
-            batch_end = batch_start + aos.shape[1]
-            batch_slice = slice(batch_start, batch_end)
 
-            rho[:,batch_slice] = eval_rho(rdm1, ao)
+            rho[:,batch_slice] = eval_rho(rdm1,ao)
             rho_grad[:,batch_slice] = eval_rho_grad(rdm1, ao, ao_grad) 
-            rho_hess[:,:,batch_slice] = eval_rho_hess(rdm1, ao, ao_grad, ao_hess) 
-
-            batch_start = batch_end    
+            rho_hess[:,:,batch_slice] = eval_rho_hess(rdm1, ao, ao_grad, ao_hess)
 
         rho_lapl = np.array([rho_hess.trace()])
         rhos = np.concatenate([rho, rho_grad, rho_lapl])
@@ -119,16 +110,20 @@ def eval_gammas(mol, grids, rdm2=None, deriv=0, batch_mem=5):
         for x,y,z components; 
         For deriv=2, 2D array of (5,N,N) array where last rows are nabla^2 rho.
     """  
+    aos = dft.numint.eval_ao(mol, grids.coords, deriv)
+    batch_length = batch_mem*1024
+
     if deriv==0:
         gamma = np.zeros((1,grids.weights.size,grids.weights.size))
-        batch_start, batch_end = 0, 0
-        # aos, mask, weights, coords
-        for aos, _, _, _ in ni.block_loop(mol, grids, mol.nao, deriv, batch_mem):  
-            ao = aos      
-            batch_end = batch_start + aos.shape[0]
-            batch_slice = slice(batch_start, batch_end)
-            gamma[:,batch_slice,batch_slice] = eval_gamma(rdm2,ao) 
-            batch_start = batch_end   
+        for i in range(0, aos.shape[0], batch_length):
+            batch_slice_i = slice(i, i+batch_length)
+            ao_i = aos[batch_slice_i, :]
+            for j in range(0, aos.shape[0], batch_length):
+                batch_slice_j = slice(j, j+batch_length)
+                ao_j = aos[batch_slice_j, :]
+
+                ao = [ao_i, ao_j]
+                gamma[:,batch_slice_i,batch_slice_j] = eval_gamma(rdm2,ao) 
 
         gammas = gamma
 
@@ -136,19 +131,24 @@ def eval_gammas(mol, grids, rdm2=None, deriv=0, batch_mem=5):
     elif deriv==1:
         gamma = np.zeros((1,grids.weights.size,grids.weights.size))
         gamma_grad = np.zeros((3,grids.weights.size,grids.weights.size))
+        for i in range(0, aos.shape[1], batch_length):
+            print(i)
+            batch_slice_i = slice(i, i+batch_length)
+            batch_aos_i = aos[:, batch_slice_i, :]
 
-        batch_start, batch_end = 0, 0
-        # aos, mask, weights, coords
-        for aos, _, _, _ in ni.block_loop(mol, grids, mol.nao, deriv, batch_mem):  
-            ao = aos[0]
-            ao_grad = aos[1:4] 
+            ao_i = batch_aos_i[0]
+            ao_grad_i = batch_aos_i[1:4]
+            for j in range(0, aos.shape[1], batch_length):
+                batch_slice_j = slice(j, j+batch_length)
+                batch_aos_j = aos[:, batch_slice_j, :]
 
-            batch_end = batch_start + aos.shape[1]
-            batch_slice = slice(batch_start, batch_end)
-            gamma[:,batch_slice,batch_slice] = eval_gamma(rdm2, ao)
-            gamma_grad[:,batch_slice,batch_slice] = eval_gamma_grad(rdm2, ao, ao_grad) 
+                ao_j = batch_aos_j[0]
+                ao_grad_j = batch_aos_j[1:4]
 
-            batch_start = batch_end  
+                ao = [ao_i, ao_j]
+                ao_grad = [ao_grad_i, ao_grad_j]
+                gamma[:,batch_slice_i,batch_slice_j] = eval_gamma(rdm2,ao) 
+                gamma_grad[:,batch_slice_i,batch_slice_j] = eval_gamma_grad(rdm2,ao,ao_grad) 
 
         gammas = np.concatenate([gamma, gamma_grad])
 
@@ -158,25 +158,36 @@ def eval_gammas(mol, grids, rdm2=None, deriv=0, batch_mem=5):
         gamma_hess = np.zeros((3,3,grids.weights.size,grids.weights.size))
         gamma_lapl = np.zeros((1,grids.weights.size,grids.weights.size))
 
-        batch_start, batch_end = 0, 0
-        # aos, mask, weights, coords
-        for aos, _, _, _ in ni.block_loop(mol, grids, mol.nao, deriv, batch_mem):  
-            ao = aos[0]
-            ao_grad = aos[1:4]
-            ao_hess = np.array([
-                [aos[4], aos[5], aos[6]],
-                [aos[5], aos[7], aos[8]],
-                [aos[6], aos[8], aos[9]],
-            ])   
+        for i in range(0, aos.shape[1], batch_length):
+            print(i)
+            batch_slice_i = slice(i, i+batch_length)
+            batch_aos_i = aos[:, batch_slice_i, :]
 
-            batch_end = batch_start + aos.shape[1]
-            batch_slice = slice(batch_start, batch_end)
+            ao_i = batch_aos_i[0]
+            ao_grad_i = batch_aos_i[1:4]
+            ao_hess_i = np.array([
+                [batch_aos_i[4], batch_aos_i[5], batch_aos_i[6]],
+                [batch_aos_i[5], batch_aos_i[7], batch_aos_i[8]],
+                [batch_aos_i[6], batch_aos_i[8], batch_aos_i[9]],
+            ])
+            for j in range(0, aos.shape[1], batch_length):
+                batch_slice_j = slice(j, j+batch_length)
+                batch_aos_j = aos[:, batch_slice_j, :]
 
-            gamma[:,batch_slice,batch_slice] = eval_gamma(rdm2, ao)
-            gamma_grad[:,batch_slice,batch_slice] = eval_gamma_grad(rdm2, ao, ao_grad) 
-            gamma_hess[:,:,batch_slice,batch_slice] = eval_gamma_hess(rdm2, ao, ao_grad, ao_hess) 
+                ao_j = batch_aos_j[0]
+                ao_grad_j = batch_aos_j[1:4]
+                ao_hess_j = np.array([
+                    [batch_aos_j[4], batch_aos_j[5], batch_aos_j[6]],
+                    [batch_aos_j[5], batch_aos_j[7], batch_aos_j[8]],
+                    [batch_aos_j[6], batch_aos_j[8], batch_aos_j[9]],
+                ])
 
-            batch_start = batch_end  
+                ao = [ao_i, ao_j]
+                ao_grad = [ao_grad_i, ao_grad_j]
+                ao_hess = [ao_hess_i, ao_hess_j]
+                gamma[:,batch_slice_i,batch_slice_j] = eval_gamma(rdm2,ao) 
+                gamma_grad[:,batch_slice_i,batch_slice_j] = eval_gamma_grad(rdm2,ao,ao_grad) 
+                gamma_hess[:,:,batch_slice_i,batch_slice_j] = eval_gamma_hess(rdm2, ao, ao_grad, ao_hess) 
 
         gamma_lapl = np.array([gamma_hess.trace()])
         gammas = np.concatenate([gamma, gamma_grad, gamma_lapl])
@@ -281,10 +292,18 @@ def eval_gamma(rdm2=None, ao=None):
     gamma : np.ndarray((Ngrids,Ngrids), dtype=float)
         Two electron density in finite field space.
     """   
-    gamma = np.einsum("uvkl, gu -> gvkl", rdm2, ao)
-    gamma = np.einsum("gvkl, gv -> gkl", gamma, ao)
-    gamma = np.einsum("gkl, hk -> ghl", gamma, ao)
-    gamma = np.einsum("ghl, hl -> gh", gamma, ao)
+    if isinstance(ao,list):
+        ao_i,ao_j = ao
+
+        gamma = np.einsum("uvkl, gu -> gvkl", rdm2, ao_i)
+        gamma = np.einsum("gvkl, gv -> gkl", gamma, ao_i)
+        gamma = np.einsum("gkl, hk -> ghl", gamma, ao_j)
+        gamma = np.einsum("ghl, hl -> gh", gamma, ao_j)
+    else:
+        gamma = np.einsum("uvkl, gu -> gvkl", rdm2, ao)
+        gamma = np.einsum("gvkl, gv -> gkl", gamma, ao)
+        gamma = np.einsum("gkl, hk -> ghl", gamma, ao)
+        gamma = np.einsum("ghl, hl -> gh", gamma, ao)
     return gamma
 
 def eval_gamma_grad(rdm2=None, ao=None, ao_grad=None):
@@ -311,15 +330,30 @@ def eval_gamma_grad(rdm2=None, ao=None, ao_grad=None):
     gamma_grad : np.ndarray((3,Ngrids,Ngrids), dtype=float)
         First derivative of two electron density in finite field space.
     """    
-    term1 = np.einsum("uvkl, rgu -> rgvkl", rdm2, ao_grad)
-    term1 = np.einsum("rgvkl, gv -> rgkl", term1, ao)
-    term1 = np.einsum("rgkl, hk -> rghl", term1, ao)
-    term1 = np.einsum("rghl, hl -> rgh", term1, ao)
+    if isinstance(ao,list):
+        ao_i,ao_j = ao
+        ao_grad_i,ao_grad_j = ao_grad
 
-    term2 = np.einsum("uvkl, gu -> gvkl", rdm2, ao)
-    term2 = np.einsum("gvkl, gv -> gkl", term2, ao)
-    term2 = np.einsum("gkl, rhk -> rghl", term2, ao_grad)
-    term2 = np.einsum("rghl, hl -> rgh", term2, ao)
+        term1 = np.einsum("uvkl, rgu -> rgvkl", rdm2, ao_grad_i)
+        term1 = np.einsum("rgvkl, gv -> rgkl", term1, ao_i)
+        term1 = np.einsum("rgkl, hk -> rghl", term1, ao_j)
+        term1 = np.einsum("rghl, hl -> rgh", term1, ao_j)
+
+        term2 = np.einsum("uvkl, gu -> gvkl", rdm2, ao_i)
+        term2 = np.einsum("gvkl, gv -> gkl", term2, ao_i)
+        term2 = np.einsum("gkl, rhk -> rghl", term2, ao_grad_j)
+        term2 = np.einsum("rghl, hl -> rgh", term2, ao_j)
+
+    else:
+        term1 = np.einsum("uvkl, rgu -> rgvkl", rdm2, ao_grad)
+        term1 = np.einsum("rgvkl, gv -> rgkl", term1, ao)
+        term1 = np.einsum("rgkl, hk -> rghl", term1, ao)
+        term1 = np.einsum("rghl, hl -> rgh", term1, ao)
+
+        term2 = np.einsum("uvkl, gu -> gvkl", rdm2, ao)
+        term2 = np.einsum("gvkl, gv -> gkl", term2, ao)
+        term2 = np.einsum("gkl, rhk -> rghl", term2, ao_grad)
+        term2 = np.einsum("rghl, hl -> rgh", term2, ao)
 
     gamma_grad = 2*term1 + 2*term2
     return gamma_grad
@@ -359,35 +393,71 @@ def eval_gamma_hess(rdm2=None, ao=None, ao_grad=None, ao_hess=None):
     rho_hess : np.ndarray((3,3,Ngrids), dtype=float)
         Second derivative of one electron density in finite field space.
     """    
-    term1 = np.einsum("uvkl, rwgu -> rwgvkl", rdm2, ao_hess)
-    term1 = np.einsum("rwgvkl, gv -> rgkl", term1, ao)
-    term1 = np.einsum("rgkl, hk -> rghl", term1, ao)
-    term1 = np.einsum("rghl, hl -> rgh", term1, ao)
+    if isinstance(ao,list):
+        ao_i,ao_j = ao
+        ao_grad_i,ao_grad_j = ao_grad
+        ao_hess_i,ao_hess_j = ao_hess
 
-    term2 = np.einsum("uvkl, gu -> gvkl", rdm2, ao)
-    term2 = np.einsum("gvkl, gv -> gkl", term2, ao)
-    term2 = np.einsum("gkl, rwhk -> rwghl", term2, ao_hess)
-    term2 = np.einsum("rwghl, hl -> rwgh", term2, ao)
+        term1 = np.einsum("uvkl, rwgu -> rwgvkl", rdm2, ao_hess_i)
+        term1 = np.einsum("rwgvkl, gv -> rgkl", term1, ao_i)
+        term1 = np.einsum("rgkl, hk -> rghl", term1, ao_j)
+        term1 = np.einsum("rghl, hl -> rgh", term1, ao_j)
 
-    term3 = np.einsum("uvkl, rgu -> rgvkl", rdm2, ao_grad)
-    term3 = np.einsum("rgvkl, wgv -> rwgkl", term3, ao_grad)
-    term3 = np.einsum("rwgkl, hk -> rwghl", term3, ao)
-    term3 = np.einsum("rwghl, hl -> rwgh", term3, ao)
+        term2 = np.einsum("uvkl, gu -> gvkl", rdm2, ao_i)
+        term2 = np.einsum("gvkl, gv -> gkl", term2, ao_i)
+        term2 = np.einsum("gkl, rwhk -> rwghl", term2, ao_hess_j)
+        term2 = np.einsum("rwghl, hl -> rwgh", term2, ao_j)
 
-    term4 = np.einsum("uvkl, rgu -> rgvkl", rdm2, ao_grad)
-    term4 = np.einsum("rgvkl, gv -> rgkl", term4, ao)
-    term4 = np.einsum("rgkl, whk -> rwghl", term4, ao_grad)
-    term4 = np.einsum("rwghl, hl -> rwgh", term4, ao)
+        term3 = np.einsum("uvkl, rgu -> rgvkl", rdm2, ao_grad_i)
+        term3 = np.einsum("rgvkl, wgv -> rwgkl", term3, ao_grad_i)
+        term3 = np.einsum("rwgkl, hk -> rwghl", term3, ao_j)
+        term3 = np.einsum("rwghl, hl -> rwgh", term3, ao_j)
 
-    term5 = np.einsum("uvkl, rgu -> rgvkl", rdm2, ao_grad)
-    term5 = np.einsum("rgvkl, gv -> rgkl", term5, ao)
-    term5 = np.einsum("rgkl, hk -> rghl", term5, ao)
-    term5 = np.einsum("rghl, whl -> rwgh", term5, ao_grad)
+        term4 = np.einsum("uvkl, rgu -> rgvkl", rdm2, ao_grad_i)
+        term4 = np.einsum("rgvkl, gv -> rgkl", term4, ao_i)
+        term4 = np.einsum("rgkl, whk -> rwghl", term4, ao_grad_j)
+        term4 = np.einsum("rwghl, hl -> rwgh", term4, ao_j)
 
-    term6 = np.einsum("uvkl, gu -> gvkl", rdm2, ao)
-    term6 = np.einsum("gvkl, gv -> gkl", term6, ao)
-    term6 = np.einsum("gkl, rhk -> rghl", term6, ao_grad)
-    term6 = np.einsum("rghl, whl -> rwgh", term6, ao_grad)
+        term5 = np.einsum("uvkl, rgu -> rgvkl", rdm2, ao_grad_i)
+        term5 = np.einsum("rgvkl, gv -> rgkl", term5, ao_i)
+        term5 = np.einsum("rgkl, hk -> rghl", term5, ao_j)
+        term5 = np.einsum("rghl, whl -> rwgh", term5, ao_grad_j)
+
+        term6 = np.einsum("uvkl, gu -> gvkl", rdm2, ao_i)
+        term6 = np.einsum("gvkl, gv -> gkl", term6, ao_i)
+        term6 = np.einsum("gkl, rhk -> rghl", term6, ao_grad_j)
+        term6 = np.einsum("rghl, whl -> rwgh", term6, ao_grad_j)
+
+    else:
+        term1 = np.einsum("uvkl, rwgu -> rwgvkl", rdm2, ao_hess)
+        term1 = np.einsum("rwgvkl, gv -> rgkl", term1, ao)
+        term1 = np.einsum("rgkl, hk -> rghl", term1, ao)
+        term1 = np.einsum("rghl, hl -> rgh", term1, ao)
+
+        term2 = np.einsum("uvkl, gu -> gvkl", rdm2, ao)
+        term2 = np.einsum("gvkl, gv -> gkl", term2, ao)
+        term2 = np.einsum("gkl, rwhk -> rwghl", term2, ao_hess)
+        term2 = np.einsum("rwghl, hl -> rwgh", term2, ao)
+
+        term3 = np.einsum("uvkl, rgu -> rgvkl", rdm2, ao_grad)
+        term3 = np.einsum("rgvkl, wgv -> rwgkl", term3, ao_grad)
+        term3 = np.einsum("rwgkl, hk -> rwghl", term3, ao)
+        term3 = np.einsum("rwghl, hl -> rwgh", term3, ao)
+
+        term4 = np.einsum("uvkl, rgu -> rgvkl", rdm2, ao_grad)
+        term4 = np.einsum("rgvkl, gv -> rgkl", term4, ao)
+        term4 = np.einsum("rgkl, whk -> rwghl", term4, ao_grad)
+        term4 = np.einsum("rwghl, hl -> rwgh", term4, ao)
+
+        term5 = np.einsum("uvkl, rgu -> rgvkl", rdm2, ao_grad)
+        term5 = np.einsum("rgvkl, gv -> rgkl", term5, ao)
+        term5 = np.einsum("rgkl, hk -> rghl", term5, ao)
+        term5 = np.einsum("rghl, whl -> rwgh", term5, ao_grad)
+
+        term6 = np.einsum("uvkl, gu -> gvkl", rdm2, ao)
+        term6 = np.einsum("gvkl, gv -> gkl", term6, ao)
+        term6 = np.einsum("gkl, rhk -> rghl", term6, ao_grad)
+        term6 = np.einsum("rghl, whl -> rwgh", term6, ao_grad)
 
     gamma_hess = 2*term1+2*term2+2*term3+4*term4+4*term5+2*term6
 
