@@ -3,7 +3,7 @@ import numpy as np
 from pyscf.dft.rks import KohnShamDFT
 from pyscf.scf.hf import SCF
 
-from pyscf.ita.eval_dens import eval_rhos, eval_gammas
+from pyscf.itchem.eval_dens import eval_rhos, eval_gammas
 
 
 __all__ = ["ElectronDensity", "OneElectronDensity", "TwoElectronDensity"]
@@ -16,12 +16,12 @@ class ElectronDensity(np.ndarray):
 
         Parameters
         ----------
-        rhos : np.ndarray((M, N), dtype=float)
-            2D array of shape (M, N) to store electron density. 
-            For deriv=0, 2D array of (1,N) to store density;  
-            For deriv=1, 2D array of (4,N) to store density and density derivatives 
+        rhos : np.ndarray((M, Ngrids), dtype=float)
+            2D array of shape (M, Ngrids) to store electron density. 
+            For deriv=0, 2D array of (1,Ngrids) to store density;  
+            For deriv=1, 2D array of (4,Ngrids) to store density and density derivatives 
             for x,y,z components;
-            For deriv=2, 2D array of (5,N) array where last rows are nabla^2 rho.             
+            For deriv=2, 2D array of (5,Ngrids) array where last rows are nabla^2 rho.             
         Returns
         -------
         obj : ElectronDensity
@@ -46,7 +46,7 @@ class ElectronDensity(np.ndarray):
 
         Returns
         -------
-        rho : np.ndarray((N,), dtype=float)
+        rho : np.ndarray((Ngrids,), dtype=float)
             Electron density on grid of N points.        
         """
         rho = np.array(self[0])
@@ -76,7 +76,7 @@ class ElectronDensity(np.ndarray):
 
         Returns
         -------
-        rho_grad : np.ndarray((3,N), dtype=float)
+        rho_grad : np.ndarray((3,Ngrids), dtype=float)
         """
         rho_grad = np.array(self[1:4])
         if mask:
@@ -103,7 +103,7 @@ class ElectronDensity(np.ndarray):
 
         Returns
         -------
-        grad_rho_norm : np.ndarray((N,), dtype=float)
+        grad_rho_norm : np.ndarray((Ngrids,), dtype=float)
         """
         grad_norm = np.linalg.norm(self.gradient(mask=mask,threshold=threshold), axis=0)
         return grad_norm
@@ -131,7 +131,7 @@ class ElectronDensity(np.ndarray):
 
         Returns
         -------
-        rho_lapl : np.ndarray((N,), dtype=float)
+        rho_lapl : np.ndarray((Ngrids,), dtype=float)
         """   
         rho_lapl = np.array(self[4])
         if mask:
@@ -149,7 +149,7 @@ class OneElectronDensity(ElectronDensity):
         >>> grids.build()
         >>> mf = scf.HF(mol)
         >>> mf.kernel()
-        >>> ed = OneElectronDenstiy.build(mf, grids)
+        >>> ed = OneElectronDenstiy.build(mf, grids_coords)
     """
     @staticmethod
     def spin_traced_rdm(rdm):
@@ -176,9 +176,8 @@ class OneElectronDensity(ElectronDensity):
     def build(
         cls, 
         method, 
-        grids, 
-        deriv=2,
-        batch_mem = 100
+        grids_coords, 
+        deriv=2
     ):
         r""" Compute the electron density of the molecule at the desired points.
 
@@ -186,19 +185,16 @@ class OneElectronDensity(ElectronDensity):
         ----------
         method : PyscfMethod
             Pyscf scf method or post-scf method instance.   
-        grids : Grids
+        grids_coords : Grids
             Pyscf Grids instance.                 
         deriv : int
             List of molecule and promolecule derivative+1 level, by default 2.
-        batch_mem : int, optional
-            Block memory in each loop, by default 100
 
         Returns
         -------
         obj : ElectronDensity
             Instance of ElectronDensity class.
         """
-
         mol = method.mol
         if isinstance(method,(SCF, KohnShamDFT)):
             # SCF/KSDFT default rdm in AO basis 
@@ -208,7 +204,7 @@ class OneElectronDensity(ElectronDensity):
             rdm1 = method.make_rdm1(ao_repr=True)
         rdm1 = cls.spin_traced_rdm(rdm1)
 
-        rhos = eval_rhos(mol, grids, rdm1, deriv=deriv, batch_mem=batch_mem)
+        rhos = eval_rhos(mol, grids_coords, rdm1, deriv=deriv)
         
         obj = cls(rhos)
         return obj
@@ -217,9 +213,8 @@ class OneElectronDensity(ElectronDensity):
     def orbital_partition(
         cls, 
         method, 
-        grids, 
-        deriv=2,
-        batch_mem = 100
+        grids_coords, 
+        deriv=2
     ):
         r""" Compute the orbital partition electron density of the molecule at the desired points.
 
@@ -231,8 +226,6 @@ class OneElectronDensity(ElectronDensity):
             Pyscf Grids instance.                 
         deriv : int
             List of molecule and promolecule derivative+1 level, by default 2.
-        batch_mem : int, optional
-            Block memory in each loop, by default 100
 
         Returns
         -------
@@ -254,7 +247,7 @@ class OneElectronDensity(ElectronDensity):
         noons = noons[filter]
         for i in range(len(noons)):
             orb_rdm1 = make_rdm1(natorbs[:,[i]], noons[[i]])
-            orb_rhos = eval_rhos(mol, grids, orb_rdm1, deriv=deriv, batch_mem=batch_mem)   
+            orb_rhos = eval_rhos(mol, grids_coords, orb_rdm1, deriv=deriv)   
             ed = cls(orb_rhos)
             partition_density.append(ed)
 
@@ -298,22 +291,19 @@ class TwoElectronDensity(ElectronDensity):
     def build(
         cls, 
         method, 
-        grids, 
-        deriv=2,
-        batch_mem=5
+        grids_coords, 
+        deriv=2
     ):
         r""" Compute the electron density of the molecule at the desired points.
 
         Parameters
         ----------
         method : PyscfMethod
-            Pyscf scf method or post-scf method instance.        
-        grids : Grids
-            Pyscf Grids instance.                 
+            Pyscf scf method or post-scf method instance.      
+        grids_coords : [np.ndarray((Ngrids,3), dtype=float), np.ndarray((Ngrids,3), dtype=float)]
+            List or tuple of grids coordinates.              
         deriv : int
             List of molecule and promolecule derivative+1 level, by default 2.
-        batch_mem : int, optional
-            Block memory in each loop, by default 5.
 
         Returns
         -------
@@ -328,8 +318,8 @@ class TwoElectronDensity(ElectronDensity):
             # Post-SCF default rdm in MO basis, here we transfer it to AO basis
             rdm2 = method.make_rdm2(ao_repr=True)        
         rdm2 = cls.spin_traced_rdm(rdm2)
-
-        gammas = eval_gammas(mol, grids, rdm2, deriv=deriv, batch_mem=batch_mem)
+        print(type(grids_coords))
+        gammas = eval_gammas(mol, grids_coords, rdm2, deriv=deriv)
 
         obj = cls(gammas)
         return obj
@@ -338,9 +328,8 @@ class TwoElectronDensity(ElectronDensity):
     def orbital_partition(
         cls, 
         method, 
-        grids, 
-        deriv=2,
-        batch_mem = 5
+        grids_coords, 
+        deriv=2
     ):
         r""" Compute the orbital partition electron density of the molecule at the desired points.
 
@@ -348,12 +337,10 @@ class TwoElectronDensity(ElectronDensity):
         ----------
         method : PyscfMethod
             Pyscf scf method or post-scf method instance.        
-        grids : Grids
-            Pyscf Grids instance.                 
+        grids_coords : [np.ndarray((Ngrids,3), dtype=float), np.ndarray((Ngrids,3), dtype=float)]
+            List or tuple of grids coordinates.              
         deriv : int
             List of molecule and promolecule derivative+1 level, by default 2.
-        batch_mem : int, optional
-            Block memory in each loop, by default 5.
 
         Returns
         -------
@@ -376,7 +363,7 @@ class TwoElectronDensity(ElectronDensity):
         noons = noons[filter]
         for i in range(len(noons)):
             orb_rdm2 = make_rdm2(natorbs[:,[i]], noons[[i]])
-            orb_gammas = eval_gammas(mol, grids, orb_rdm2, deriv=deriv, batch_mem=batch_mem)   
+            orb_gammas = eval_gammas(mol, grids_coords, orb_rdm2, deriv=deriv)   
             ed = cls(orb_gammas)
             partition_density.append(ed)
 
@@ -390,12 +377,12 @@ class PartitionDensity(list):
 
         Parameters
         ----------
-        rhos : np.ndarray((M, N), dtype=float)
-            2D array of shape (M, N) to store electron density. 
-            For deriv=0, 2D array of (1,N) to store density;  
-            For deriv=1, 2D array of (4,N) to store density and density derivatives 
+        rhos : np.ndarray((M, Ngrids), dtype=float)
+            2D array of shape M, Ngrids) to store electron density. 
+            For deriv=0, 2D array of (1,Ngrids) to store density;  
+            For deriv=1, 2D array of (4,Ngrids) to store density and density derivatives 
             for x,y,z components; 
-            For deriv=2, 2D array of (5,N) array where last rows are nabla^2 rho.             
+            For deriv=2, 2D array of (5,Ngrids) array where last rows are nabla^2 rho.             
 
         Returns
         -------
@@ -421,7 +408,7 @@ class PartitionDensity(list):
 
         Returns
         -------
-        rho : np.ndarray((N,), dtype=float)
+        rho : np.ndarray((Ngrids,), dtype=float)
         """
         rho = np.array(sum(self)[0])
         if mask:
@@ -450,7 +437,7 @@ class PartitionDensity(list):
 
         Returns
         -------
-        rho_grad : np.ndarray((3,N), dtype=float)
+        rho_grad : np.ndarray((3,Ngrids), dtype=float)
         """
         rho_grad = np.array(sum(self)[1:4])
         if mask:
@@ -477,7 +464,7 @@ class PartitionDensity(list):
 
         Returns
         -------
-        grad_norm : np.ndarray((N,), dtype=float)
+        grad_norm : np.ndarray((Ngrids,), dtype=float)
         """
         grad_norm = np.linalg.norm(self.gradient(mask=mask,fill=threshold), axis=0)
         return grad_norm
@@ -505,7 +492,7 @@ class PartitionDensity(list):
 
         Returns
         -------
-        rho_lapl : np.ndarray((N,), dtype=float)
+        rho_lapl : np.ndarray((Ngrids,), dtype=float)
         """   
         rho_lapl = np.array(sum(self)[4])
         if mask:

@@ -16,7 +16,7 @@
 NAME = 'pyscf-ita'
 AUTHOR = 'Yilin Zhao'
 AUTHOR_EMAIL = None
-DESCRIPTION  = 'PySCF extension module for Information-theoretic approach.'
+DESCRIPTION  = 'PySCF Extension Module For Information-Theoretic Approach Descriptors.'
 SO_EXTENSIONS = {
 }
 DEPENDENCIES = ['pyscf', 'numpy']

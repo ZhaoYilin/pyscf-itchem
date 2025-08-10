@@ -1,7 +1,7 @@
 import numpy as np
 
 def eval_odm1(i, rdm1s=None, rdm2s=None, seniority_zero=True):
-    r"""Evaluate the one orbital reduced density matrix (1-ODM).
+    r""" Evaluate the one orbital reduced density matrix (1-ODM).
 
     Parameters
     ----------    

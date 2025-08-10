@@ -1,24 +1,94 @@
 import numpy as np
 
-class ItaDensity(object):
-    r"""Information-Theoretic Approch (ITA) Density class.
+from pyscf.itchem.dens import OneElectronDensity, TwoElectronDensity
+from pyscf.itchem.ked import KineticEnergyDensity
+from pyscf.itchem.scope import Local, NonLocal
+
+class ItaDensity(Local):
+    r"""Local Information-Theoretic Approch (ITA) Density class.
+
+    Attributes
+    ----------
+    dens : ElectronDensity, optional
+        Electron density and it's derivative.
+    keds : KineticEnergyDensity, optional
+        Kenitic electron density.
     """
+    dens = None
+    keds = None    
     def __init__(
         self, 
-        dens=None, 
-        keds=None
+        method=None, 
+        grids_coords=None,
+        rung=3, 
+        normalize=None
     ):
-        r""" Initialize a instance.
+        r"""Initialize a instance.
 
         Parameters
         ----------
-        dens : ElectronDensity, optional
-            ElectronEensity instance for molecule, by default None.
-        keds : KineticEnergyDensity, optional
-            KineticEnergyDensity instance for molecule, by default None.
-        """        
+        method : PyscfMethod
+            Pyscf scf method or post-scf method instance.
+        grids_coords : np.ndarray((Ngrids,3), dtype=float), optional
+            Grids coordinates on N points, by default None.            
+        rung : int, optional
+            Density derivate+1 level, by default 3.
+        normalize : bool, optional 
+            If the electron density normalized, by default None.            
+        """
+        self.method = method
+        self.grids_coords = grids_coords 
+        self.rung = rung
+        self.normalize = normalize
+
+    def build(
+        self, 
+        method=None, 
+        grids_coords=None,
+        rung=None, 
+        normalize=None
+    ):
+        r"""Setup ITA and initialize some control parameters. Whenever you
+        change the value of the attributes of :class:`ITA`, you need call
+        this function to refresh the internal data of ITA.
+
+        Parameters
+        ----------
+        method : PyscfMethod, optional
+            Pyscf scf method or post-scf method instance, by deafult None.
+        grids_coords : np.ndarray((Ngrids,3), dtype=float), optional
+            Grids coordinates on N points, by default None.            
+        rung : int
+            Density derivate+1 level, by default 3,.           
+        normalize : bool, optional 
+            If the electron density normalized, by default None.            
+        """
+        if method is None: method = self.method 
+        else: self.method = method
+        if grids_coords is None: grids_coords = self.grids_coords
+        else: self.grids_coords = grids_coords
+        if rung is None: rung = self.rung
+        else: self.rung = rung
+        if normalize is None: normalize = self.normalize
+        else: self.normalize = normalize
+
+        # Build molecule electron density.
+        nelec = self.method.mol.nelectron
+        if rung==4:
+            dens = OneElectronDensity.build(method, grids_coords, deriv=self.rung-2)
+            orbdens = OneElectronDensity.orbital_partition(method, grids_coords, deriv=1)
+            keds = KineticEnergyDensity()
+            keds.dens = dens
+            keds.orbdens = orbdens
+            self.keds = keds   
+        else:
+            dens = OneElectronDensity.build(method, grids_coords, deriv=self.rung-1)
+            if normalize: 
+                dens = dens/nelec
+        
         self.dens = dens
-        self.keds = keds
+
+        return self
 
     def rho_power(
         self, 
@@ -32,14 +102,14 @@ class ItaDensity(object):
         ----------
         n : int, optional
             Order of rho power, by default 2.
-        rho : np.ndarray((N,), dtype=float), optional
+        rho : np.ndarray((Ngrids,), dtype=float), optional
             Electron density on grid of N points, by default None.
-        omega : np.ndarray((N,), dtype=float), optional
+        omega : np.ndarray((Ngrids,), dtype=float), optional
             Sharing function of single atom, by default None.
 
         Returns
         -------
-        ita_density : np.ndarray(dtype=float)
+        ita_density : np.ndarray((Ngrids,), dtype=float)
             Information theory density on grid of N points.
         """
         if rho is None:           
@@ -62,14 +132,14 @@ class ItaDensity(object):
 
         Parameters
         ----------
-        rho : np.ndarray((N,), dtype=float), optional
+        rho : np.ndarray((Ngrids,), dtype=float), optional
             Electron density on grid of N points, by default None.
-        omega : np.ndarray((N,), dtype=float), optional
+        omega : np.ndarray((Ngrids,), dtype=float), optional
             Sharing function of single atom, by default None.
             
         Returns
         -------
-        ita_density : np.ndarray((N,), dtype=float)
+        ita_density : np.ndarray((Ngrids,), dtype=float)
             Information theory density on grid of N points.
         """
         if rho is None: 
@@ -93,16 +163,16 @@ class ItaDensity(object):
 
         Parameters
         ----------
-        rho : np.ndarray((N,), dtype=float), optional
+        rho : np.ndarray((Ngrids,), dtype=float), optional
             Electron density on grid of N points, by default None.
-        rho_grad_norm : np.ndarray((N,), dtype=float), optional
+        rho_grad_norm : np.ndarray((Ngrids,), dtype=float), optional
             Electron density graident norm on grid of N points, by default None.
-        omega : np.ndarray((N,), dtype=float), optional
+        omega : np.ndarray((Ngrids,), dtype=float), optional
             Sharing function of single atom, by default None.
 
         Returns
         -------
-        ita_density : np.ndarray((N,), dtype=float)
+        ita_density : np.ndarray((Ngrids,), dtype=float)
             Information theory density on grid of N points.
         """      
         if rho is None: 
@@ -129,16 +199,16 @@ class ItaDensity(object):
 
         Parameters
         ----------
-        rho : np.ndarray((N,), dtype=float), optional
+        rho : np.ndarray((Ngrids,), dtype=float), optional
             Electron density on grid of N points, by default None.
-        rho_lapl : np.ndarray((N,), dtype=float), optional
+        rho_lapl : np.ndarray((Ngrids,), dtype=float), optional
             Electron density laplacian on grid of N points, by default None.
-        omega : np.ndarray((N,), dtype=float), optional
+        omega : np.ndarray((Ngrids,), dtype=float), optional
             Sharing function of single atom, by default None.
 
         Returns
         -------
-        ita_density : np.ndarray((N,), dtype=float)
+        ita_density : np.ndarray((Ngrids,), dtype=float)
             Information theory density on grid of N points.
         """            
         if rho is None: 
@@ -168,20 +238,20 @@ class ItaDensity(object):
 
         Parameters
         ----------
-        rho : np.ndarray((N,), dtype=float), optional
+        rho : np.ndarray((Ngrids,), dtype=float), optional
             Electron density on grid of N points, by default None.
-        ts : np.ndarray((N,), dtype=float), optional
+        ts : np.ndarray((Ngrids,), dtype=float), optional
             Single particle kenetic Electron density on grid of N points, by default None.
-        tTF : np.ndarray((N,), dtype=float), optional
+        tTF : np.ndarray((Ngrids,), dtype=float), optional
             Thomas-Fermi kinetic energy density on grid of N points, by default None.
         k : float, optional
             Boltzmann constant, by default 1.0 for convenience.
-        omega : np.ndarray((N,), dtype=float), optional
+        omega : np.ndarray((Ngrids,), dtype=float), optional
             Sharing function of single atom, by default None.
 
         Returns
         -------
-        ita_density : np.ndarray((N,), dtype=float)
+        ita_density : np.ndarray((Ngrids,), dtype=float)
             Information theory density on grid of N points.
         """
         if rho is None: 
@@ -201,25 +271,85 @@ class ItaDensity(object):
         ita_density = 1.5*k*rho*(c+np.ma.log(ts/tTF))   
         return ita_density  
 
-class RelativeItaDensity(ItaDensity):
+class RelativeItaDensity(ItaDensity, Local):
     r"""Relative Information-Theoretic Approch (ITA) Density class.
     """
+    dens = None
+    prodens = None    
     def __init__(
         self, 
-        dens=None, 
-        prodens=None
+        method=None, 
+        grids_coords=None,
+        rung=3,
+        normalize=None, 
+        promolecule=None
     ):
-        r""" Initialize a instance.
+        r"""Initialize a instance.
 
         Parameters
         ----------
-        dens : ElectronDensity, optional
-            ElectronEensity instance for molecule, by default None.
-        prodens : ElectronDensity, optional
-            ElectronEensity instance for promolecule, by default None.
-        """        
+        method : PyscfMethod
+            Pyscf scf method or post-scf method instance.
+        grids_coords : np.ndarray((Ngrids,3), dtype=float), optional
+            Grids coordinates on N points, by default None.            
+        rung : int, optional
+            Density derivate+1 level, by default 3.
+        normalize : bool, optional 
+            If the electron density normalized, by default None.            
+        """
+        ItaDensity.__init__(self, method, grids_coords, rung, normalize)
+        self.promolecule = promolecule
+
+    def build(
+        self, 
+        method=None, 
+        grids_coords=None,
+        rung=None, 
+        normalize=None,
+        promolecule=None,
+    ):
+        r"""Setup ITA and initialize some control parameters. Whenever you
+        change the value of the attributes of :class:`ITA`, you need call
+        this function to refresh the internal data of ITA.
+
+        Parameters
+        ----------
+        method : PyscfMethod, optional
+            Pyscf scf method or post-scf method instance, by deafult None.
+        grids_coords : np.ndarray((Ngrids,3), dtype=float), optional
+            Grids coordinates on N points, by default None.            
+        rung : int
+            Density derivate+1 level, by default 3,.           
+        normalize : bool, optional 
+            If the electron density normalized, by default None.            
+        """
+        if method is None: method = self.method 
+        else: self.method = method
+        if grids_coords is None: grids_coords = self.grids_coords
+        else: self.grids_coords = grids_coords
+        if rung is None: rung = self.rung
+        else: self.rung = rung
+        if normalize is None: normalize = self.normalize
+        else: self.normalize = normalize
+        if promolecule is None: promolecule = self.promolecule
+        else: self.promolecule = promolecule
+
+        if promolecule is None:
+            from pyscf.itchem.promolecule import ProMolecule
+            promolecule = ProMolecule(method).build()
+            self.promolecule = promolecule
+
+        # Build molecule electron density.
+        nelec = self.method.mol.nelectron
+        dens = OneElectronDensity.build(method, grids_coords, deriv=rung-1)  
+        prodens = promolecule.one_electron_density(grids_coords, deriv=rung-1)
+        if normalize: 
+            dens = dens/nelec
+            prodens = prodens/nelec
         self.dens = dens
         self.prodens = prodens
+
+        return self
 
     def shannon_entropy(
         self, 
@@ -234,16 +364,16 @@ class RelativeItaDensity(ItaDensity):
 
         Parameters
         ----------
-        rho : np.ndarray(dtype=float), optional
+        rho : np.ndarray((Ngrids,), dtype=float), optional
             Electron density on grid of N points, by default None.
-        prorho : np.ndarray(dtype=float), optional
+        prorho : np.ndarray((Ngrids,), dtype=float), optional
             Electron density of promolecule on grid of N points, by default None.
-        omega : np.ndarray(dtype=float), optional
+        omega : np.ndarray((Ngrids,), dtype=float), optional
             Sharing function of single atom, by default None.
 
         Returns
         -------
-        ita_density : np.ndarray(dtype=float)
+        ita_density : np.ndarray((Ngrids,), dtype=float)
             Information theory density on grid of N points.
         """
         if rho is None:           
@@ -277,20 +407,20 @@ class RelativeItaDensity(ItaDensity):
 
         Parameters
         ----------
-        rho : np.ndarray(dtype=float), optional
+        rho : np.ndarray((Ngrids,), dtype=float), optional
             Electron density on grid of N points, by default None.
-        prorho : np.ndarray(dtype=float), optional
+        prorho : np.ndarray((Ngrids,), dtype=float), optional
             Electron density of promolecule on grid of N points, by default None.
-        rho_grad : np.ndarray(dtype=float), optional
+        rho_grad : np.ndarray((Ngrids,), dtype=float), optional
             Electron density graident on grid of N points, by default None.
-        prorho_grad : np.ndarray(dtype=float), optional
+        prorho_grad : np.ndarray((Ngrids,), dtype=float), optional
             Electron density graident of promolecule on grid of N points, by default None.
-        omega : np.ndarray(dtype=float), optional
+        omega : np.ndarray((Ngrids,), dtype=float), optional
             Sharing function of single atom, by default None.
 
         Returns
         -------
-        ita_density : np.ndarray(dtype=float)
+        ita_density : np.ndarray((Ngrids,), dtype=float)
             Information theory density on grid of N points.
         """
         if rho is None:           
@@ -323,18 +453,18 @@ class RelativeItaDensity(ItaDensity):
 
         Parameters
         ----------
-        rho : np.ndarray(dtype=float), optional
+        rho : np.ndarray((Ngrids,), dtype=float), optional
             Electron density on grid of N points, by default None.
-        prorho : np.ndarray(dtype=float), optional
+        prorho : np.ndarray((Ngrids,), dtype=float), optional
             Electron density of promolecule on grid of N points, by default None.
-        rho_lapl : np.ndarray(dtype=float), optional
+        rho_lapl : np.ndarray((Ngrids,), dtype=float), optional
             Electron density laplacian on grid of N points, by default None.
-        omega : np.ndarray(dtype=float), optional
+        omega : np.ndarray((Ngrids,), dtype=float), optional
             Sharing function of single atom, by default None.
 
         Returns
         -------
-        ita_density : np.ndarray(dtype=float)
+        ita_density : np.ndarray(Ngrids,) dtype=float)
             Information theory density on grid of N points.
         """
         if rho is None:           
@@ -365,16 +495,16 @@ class RelativeItaDensity(ItaDensity):
         ----------
         n : int, optional
             Order of relative Renyi entropy, by default 2.
-        rho : np.ndarray(dtype=float), optional
+        rho : np.ndarray((Ngrids,), dtype=float), optional
             Electron density on grid of N points, by default None.
-        prorho : np.ndarray(dtype=float), optional
+        prorho : np.ndarray((Ngrids,), dtype=float), optional
             Electron density of promolecule on grid of N points, by default None.
-        omega : np.ndarray(dtype=float), optional
+        omega : np.ndarray((Ngrids,), dtype=float), optional
             Sharing function of single atom, by default None.
 
         Returns
         -------
-        ita_density : np.ndarray(dtype=float)
+        ita_density : np.ndarray((Ngrids,), dtype=float)
             Information theory density on grid of N points.
         """           
         if rho is None:           
@@ -406,18 +536,18 @@ class RelativeItaDensity(ItaDensity):
 
         Parameters
         ----------
-        rho : np.ndarray(dtype=float), optional
+        rho : np.ndarray((Ngrids,), dtype=float), optional
             Electron density on grid of N points, by default None.
-        prorho : np.ndarray(dtype=float), optional
+        prorho : np.ndarray((Ngrids,), dtype=float), optional
             Electron density of promolecule on grid of N points, by default None.
-        rho_lapl : np.ndarray(dtype=float), optional
+        rho_lapl : np.ndarray((Ngrids,), dtype=float), optional
             Electron density laplacian on grid of N points, by default None.
-        omega : np.ndarray(dtype=float), optional
+        omega : np.ndarray((Ngrids,), dtype=float), optional
             Sharing function of single atom, by default None.
 
         Returns
         -------
-        ita_density : np.ndarray(dtype=float)
+        ita_density : np.ndarray((Ngrids,), dtype=float)
             Information theory density on grid of N points.
         """
         return self.alternative_fisher_information(rho, prorho, rho_lapl, omega) 
@@ -441,20 +571,20 @@ class RelativeItaDensity(ItaDensity):
 
         Parameters
         ----------
-        rho : np.ndarray(dtype=float), optional
+        rho : np.ndarray((Ngrids,), dtype=float), optional
             Electron density on grid of N points, by default None.
-        prorho : np.ndarray(dtype=float), optional
+        prorho : np.ndarray((Ngrids,), dtype=float), optional
             Electron density of promolecule on grid of N points, by default None.
-        rho_lapl : np.ndarray(dtype=float), optional
+        rho_lapl : np.ndarray((Ngrids,), dtype=float), optional
             Electron density laplacian on grid of N points, by default None.
-        prorho_lapl : np.ndarray(dtype=float), optional
+        prorho_lapl : np.ndarray((Ngrids,), dtype=float), optional
             Electron density laplacian of promolecule on grid of N points, by default None.
-        omega : np.ndarray(dtype=float), optional
+        omega : np.ndarray((Ngrids,), dtype=float), optional
             Sharing function of single atom, by default None.
 
         Returns
         -------
-        ita_density : np.ndarray(dtype=float)
+        ita_density : np.ndarray((Ngrids,), dtype=float)
             Information theory density on grid of N points.
         """
         if rho is None:           
@@ -493,43 +623,88 @@ class RelativeItaDensity(ItaDensity):
 
         Parameters
         ----------
-        rho : np.ndarray(dtype=float), optional
+        rho : np.ndarray((Ngrids,), dtype=float), optional
             Electron density on grid of N points, by default None.
-        prorho : np.ndarray(dtype=float), optional
+        prorho : np.ndarray((Ngrids,), dtype=float), optional
             Electron density of promolecule on grid of N points, by default None.
-        rho_grad : np.ndarray(dtype=float), optional
+        rho_grad : np.ndarray((Ngrids,), dtype=float), optional
             Electron density graident on grid of N points, by default None.
-        prorho_grad : np.ndarray(dtype=float), optional
+        prorho_grad : np.ndarray((Ngrids,), dtype=float), optional
             Electron density graident of promolecule on grid of N points, by default None.
-        omega : np.ndarray(dtype=float), optional
+        omega : np.ndarray((Ngrids,), dtype=float), optional
             Sharing function of single atom, by default None.
 
         Returns
         -------
-        ita_density : np.ndarray(dtype=float)
+        ita_density : np.ndarray((Ngrids,), dtype=float)
             Information theory density on grid of N points.
         """
         return self.fisher_information(rho, prorho, rho_grad, prorho_grad, omega)
 
-class JointItaDensity(ItaDensity):
-    r"""Information-Theoretic Approch (ITA) Density class.
+class JointItaDensity(ItaDensity, NonLocal):
+    r"""Joint Information-Theoretic Approch (ITA) Density class.
     """
     def __init__(
         self, 
-        dens=None,
-        keds=None 
+        method=None, 
+        grids_coords=None,
+        rung=3, 
+        normalize=None
     ):
-        r""" Initialize a instance.
+        r"""Initialize a instance.
 
         Parameters
         ----------
-        dens : ElectronDensity, optional
-            ElectronEensity instance for molecule, by default None.
-        keds : KineticEnergyDensity, optional
-            KineticEnergyDensity instance for molecule, by default None.
-        """       
+        method : PyscfMethod
+            Pyscf scf method or post-scf method instance.
+        grids_coords : np.ndarray((N,3), dtype=float), optional
+            Grids coordinates on N points, by default None.            
+        rung : int, optional
+            Density derivate+1 level, by default 3.
+        normalize : bool, optional 
+            If the electron density normalized, by default None.            
+        """
+        ItaDensity.__init__(self, method, grids_coords, rung, normalize)        
+
+    def build(
+        self, 
+        method=None, 
+        grids_coords=None,
+        rung=None, 
+        normalize=None
+    ):
+        r"""Setup ITA and initialize some control parameters. Whenever you
+        change the value of the attributes of :class:`ITA`, you need call
+        this function to refresh the internal data of ITA.
+
+        Parameters
+        ----------
+        method : PyscfMethod, optional
+            Pyscf scf method or post-scf method instance, by deafult None.
+        grids_coords : np.ndarray((N,3), dtype=float), optional
+            Grids coordinates on N points, by default None.            
+        rung : int
+            Density derivate+1 level, by default 3,.           
+        normalize : bool, optional 
+            If the electron density normalized, by default None.            
+        """
+        if method is None: method = self.method 
+        else: self.method = method
+        if grids_coords is None: grids_coords = self.grids_coords
+        else: self.grids_coords = grids_coords
+        if rung is None: rung = self.rung
+        else: self.rung = rung
+        if normalize is None: normalize = self.normalize
+        else: self.normalize = normalize
+
+        # Build molecule electron density.
+        nelec = self.method.mol.nelectron
+        dens = TwoElectronDensity.build(method, grids_coords, deriv=rung-1)
+        if normalize: 
+            dens = dens/(nelec*(nelec-1))
+        
         self.dens = dens
-        self.keds = keds
+        return self
 
     def rho_power(
         self, 
@@ -635,63 +810,86 @@ class JointItaDensity(ItaDensity):
             Information theory density on grid of N points.
         """  
         ita_density = super(JointItaDensity, self).alternative_fisher_information(gamma,gamma_lapl,omega)
-        return ita_density                  
-
-    def GBP_entropy(
-        self, 
-        gamma=None, 
-        ts=None, 
-        tTF=None, 
-        k=1.0,
-        omega=None
-    ):
-        r"""Ghosh-Berkowitz-Parr (GBP) entropy density :math:`s_{GBP}` defined as:
-
-        .. math::
-            s_{GBP} = \frac{3}{2}k\gamma(\mathbf{r}) 
-                \left[ c+\ln \frac{t(\mathbf{r};\gamma)}{t_{TF}(\mathbf{r};\gamma)} \right]
-
-        Parameters
-        ----------
-        gamma : np.ndarray((N,N), dtype=float), optional
-            Two electron density on grid of N points, by default None.
-        ts : np.ndarray((N,N), dtype=float), optional
-            Single particle kenetic Electron density on grid of N points, by default None.
-        tTF : np.ndarray((N,N), dtype=float), optional
-            Thomas-Fermi kinetic energy density on grid of N points, by default None.
-        k : float, optional
-            Boltzmann constant, by default 1.0 for convenience.
-        omega : np.ndarray((N,N), dtype=float), optional
-            Sharing function of single atom, by default None.
-
-        Returns
-        -------
-        ita_density : np.ndarray((N,N), dtype=float)
-            Information theory density on grid of N points.
-        """
-        ita_density = super(JointItaDensity, self).GBP_entropy(gamma,ts,tTF,k,omega)
-        return ita_density                  
+        return ita_density                                    
     
-class ConditionalItaDensity(ItaDensity):
+class ConditionalItaDensity(ItaDensity, NonLocal):
     r"""Conditional Information-Theoretic Approch (ITA) Density class.
+    
+    Attributes
+    ----------
+    onedens : OneElectronDensity, optional
+        One electron density and it's derivative.
+    twodens : TwoElectronDensity, optional
+        Two electron density and it's derivative.
     """
+    onedens = None
+    twodens = None    
     def __init__(
         self, 
-        onedens=None,
-        twodens=None 
+        method=None, 
+        grids_coords=None,
+        rung=3, 
+        normalize=None
     ):
-        r""" Initialize a instance.
+        r"""Initialize a instance.
 
         Parameters
         ----------
-        onedens : ElectronDensity, optional
-            One particle ElectronEensity instance for molecule, by default None.
-        twodens : ElectronDensity, optional
-            Two particle ElectronEensity instance for reference, by default None.
-        """        
+        method : PyscfMethod
+            Pyscf scf method or post-scf method instance.
+        grids_coords : np.ndarray((N,3), dtype=float), optional
+            Grids coordinates on N points, by default None.            
+        rung : int, optional
+            Density derivate+1 level, by default 3.
+        normalize : bool, optional 
+            If the electron density normalized, by default None.            
+        """
+        ItaDensity.__init__(self, method, grids_coords, rung, normalize)   
+
+    def build(
+        self, 
+        method=None, 
+        grids_coords=None,
+        rung=None, 
+        normalize=None
+    ):
+        r"""Setup ITA and initialize some control parameters. Whenever you
+        change the value of the attributes of :class:`ITA`, you need call
+        this function to refresh the internal data of ITA.
+
+        Parameters
+        ----------
+        method : PyscfMethod, optional
+            Pyscf scf method or post-scf method instance, by deafult None.
+        grids_coords : np.ndarray((N,3), dtype=float), optional
+            Grids coordinates on N points, by default None.            
+        rung : int
+            Density derivate+1 level, by default 3,.           
+        normalize : bool, optional 
+            If the electron density normalized, by default None.            
+        """
+        if method is None: method = self.method 
+        else: self.method = method
+        if grids_coords is None: grids_coords = self.grids_coords
+        else: self.grids_coords = grids_coords
+        if rung is None: rung = self.rung
+        else: self.rung = rung
+        if normalize is None: normalize = self.normalize
+        else: self.normalize = normalize
+
+        # Build molecule electron density.
+        nelec = self.method.mol.nelectron
+        onedens = OneElectronDensity.build(method, grids_coords, deriv=rung-1)
+        twodens = TwoElectronDensity.build(method, grids_coords, deriv=rung-1)
+        if normalize: 
+            onedens = onedens/nelec
+            twodens = twodens/(nelec*(nelec-1))
+
         self.onedens = onedens
         self.twodens = twodens
 
+        return self
+    
     def rho_power(
         self, 
         n=2, 
@@ -763,7 +961,7 @@ class ConditionalItaDensity(ItaDensity):
 
         rho = np.ma.masked_less(rho, 1.0e-30)
         rho.filled(1.0e-30)
-        ita_density = gamma*np.ma.log(gamma/rho)
+        ita_density = -gamma*np.ma.log(gamma/rho)
         return ita_density
 
 
@@ -868,26 +1066,77 @@ class ConditionalItaDensity(ItaDensity):
         ita_density = gamma_lapl*np.ma.log(gamma/rho)
         return ita_density 
 
-class MutualItaDensity(ItaDensity):
+class MutualItaDensity(ItaDensity, NonLocal):
     r"""Mutual Information-Theoretic Approch (ITA) Density class.
     """
+    onedens = None
+    twodens = None    
     def __init__(
         self, 
-        onedens=None,
-        twodens=None 
+        method=None, 
+        grids_coords=None,
+        rung=3, 
+        normalize=None
     ):
-        r""" Initialize a instance.
+        r"""Initialize a instance.
 
         Parameters
         ----------
-        onedens : ElectronDensity, optional
-            One particle ElectronEensity instance for molecule, by default None.
-        twodens : ElectronDensity, optional
-            Two particle ElectronEensity instance for reference, by default None.
-        """        
+        method : PyscfMethod
+            Pyscf scf method or post-scf method instance.
+        grids_coords : np.ndarray((N,3), dtype=float), optional
+            Grids coordinates on N points, by default None.            
+        rung : int, optional
+            Density derivate+1 level, by default 3.
+        normalize : bool, optional 
+            If the electron density normalized, by default None.            
+        """
+        ItaDensity.__init__(self, method, grids_coords, rung, normalize)   
+
+    def build(
+        self, 
+        method=None, 
+        grids_coords=None,
+        rung=None, 
+        normalize=None
+    ):
+        r"""Setup ITA and initialize some control parameters. Whenever you
+        change the value of the attributes of :class:`ITA`, you need call
+        this function to refresh the internal data of ITA.
+
+        Parameters
+        ----------
+        method : PyscfMethod, optional
+            Pyscf scf method or post-scf method instance, by deafult None.
+        grids_coords : np.ndarray((N,3), dtype=float), optional
+            Grids coordinates on N points, by default None.            
+        rung : int
+            Density derivate+1 level, by default 3,.           
+        normalize : bool, optional 
+            If the electron density normalized, by default None.            
+        """
+        if method is None: method = self.method 
+        else: self.method = method
+        if grids_coords is None: grids_coords = self.grids_coords
+        else: self.grids_coords = grids_coords
+        if rung is None: rung = self.rung
+        else: self.rung = rung
+        if normalize is None: normalize = self.normalize
+        else: self.normalize = normalize
+
+        # Build molecule electron density.
+        nelec = self.method.mol.nelectron
+        onedens = OneElectronDensity.build(method, grids_coords, deriv=rung-1)
+        twodens = TwoElectronDensity.build(method, grids_coords, deriv=rung-1)
+        if normalize: 
+            onedens = onedens/nelec
+            twodens = twodens/(nelec*(nelec-1))
+
         self.onedens = onedens
         self.twodens = twodens
 
+        return self
+    
     def rho_power(
         self, 
         n=2, 
@@ -1018,7 +1267,7 @@ class MutualItaDensity(ItaDensity):
 
         # r in (x,y,z) 
         term1 = np.array([gamma_r/gamma for gamma_r in gamma_grad]) 
-        term2 = np.array([(np.outer(rho,rho)+np.outer(rho_r,rho))/rho_outer for rho_r in rho_grad])
+        term2 = np.array([(np.outer(rho,rho_r)+np.outer(rho_r,rho))/rho_outer for rho_r in rho_grad])
         ita_density = gamma*np.linalg.norm(term1-term2, axis=0)**2 
 
         return ita_density   

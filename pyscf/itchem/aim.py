@@ -1,6 +1,6 @@
 import numpy as np
 from functools import partial
-from pyscf.ita.promolecule import ProMolecule
+from pyscf.itchem.promolecule import ProMolecule
 
 __all__ = ["Hirshfeld"]
 

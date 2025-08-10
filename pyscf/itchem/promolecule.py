@@ -6,7 +6,7 @@ from pyscf.dft.rks import KohnShamDFT
 from pyscf.scf.hf import SCF        
 from pyscf.data.elements import NRSRHF_CONFIGURATION
 
-from pyscf.ita.utils.constants import MULTIPLICITIES
+from pyscf.itchem.utils.constants import MULTIPLICITIES
 
 __all__ = ["ProMolecule"]
 
@@ -193,15 +193,15 @@ class ProMolecule:
 
     def one_electron_density(
         self, 
-        grids, 
+        grids_coords, 
         deriv=2
     ):
         """ Compute the electron density of the promolecule at the desired points.
 
         Parameters
         ----------
-        grid_coords: np.ndarray((N, 3), dtype=float)
-            Points at which to compute the density.
+        grids_coords : np.ndarray((Ngrids,3), dtype=float)
+            Grids coordinates on N points.         
         spin: ('ab' | 'a' | 'b' | 'm')
             Type of density to compute; either total, alpha-spin, beta-spin, or magnetization density,
             by default 'ab'.            
@@ -213,14 +213,14 @@ class ProMolecule:
         PartitionDensity
             Instance of PartitionDensity class. 
         """
-        from pyscf.ita.dens import OneElectronDensity, PartitionDensity
+        from pyscf.itchem.dens import OneElectronDensity, PartitionDensity
         element_methods = self.element_methods
 
         proatom_dens_list = []
         for atom_geom in self.method.mol._atom:
             symbol = atom_geom[0]
             element_methods[symbol].mol.set_geom_([atom_geom],unit='B')  
-            free_atom_dens = OneElectronDensity.build(element_methods[symbol], grids=grids, deriv=deriv)
+            free_atom_dens = OneElectronDensity.build(element_methods[symbol], grids_coords=grids_coords, deriv=deriv)
             proatom_dens_list.append(free_atom_dens)
 
         promoldens = PartitionDensity(proatom_dens_list)

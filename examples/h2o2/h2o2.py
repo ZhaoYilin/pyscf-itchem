@@ -1,6 +1,6 @@
 from pyscf import gto, scf, dft
-from pyscf.ita.promolecule import ProMolecule
-from pyscf.ita.kernel import ITA
+from pyscf.itchem.promolecule import ProMolecule
+from pyscf.itchem.kernel import ITA
 
 filename = 'h2o2.xyz'
 
