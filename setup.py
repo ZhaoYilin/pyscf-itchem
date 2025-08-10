@@ -13,10 +13,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-NAME = 'pyscf-ita'
+NAME = 'pyscf-itchem'
 AUTHOR = 'Yilin Zhao'
-AUTHOR_EMAIL = None
-DESCRIPTION  = 'PySCF Extension Module For Information-Theoretic Approach Descriptors.'
+AUTHOR_EMAIL = 'zhaoyilin10@foxmail.com'
+DESCRIPTION  = 'A PySCF extension module for information-theoretic chemistry analysis.'
 SO_EXTENSIONS = {
 }
 DEPENDENCIES = ['pyscf', 'numpy']
